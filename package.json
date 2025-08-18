@@ -1,0 +1,44 @@
+{
+  "name": "@cygnus-wealth/sol-integration",
+  "version": "0.1.0",
+  "description": "Read-only Solana integration for CygnusWealth portfolio aggregation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "vitest run src/test/e2e",
+    "test:integration": "vitest run src/test/integration",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "solana",
+    "web3",
+    "spl-tokens",
+    "nft",
+    "cygnus-wealth",
+    "ddd",
+    "portfolio"
+  ],
+  "author": "CygnusWealth",
+  "license": "MIT",
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.7.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/ui": "^3.2.4",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@cygnus-wealth/data-models": "file:../data-models",
+    "@metaplex-foundation/js": "^0.20.1",
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.4"
+  },
+  "type": "commonjs"
+}
