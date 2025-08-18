@@ -14,7 +14,7 @@ import { SolanaAsset } from '../domain/asset/aggregates/SolanaAsset';
 import { NFTAsset } from '../domain/asset/entities/NFTAsset';
 import { TokenAmount } from '../domain/asset/valueObjects/TokenAmount';
 import { Result } from '../domain/shared/Result';
-import { DomainError } from '../domain/shared/DomainError';
+import { DomainError, ValidationError, NetworkError, PortfolioError } from '../domain/shared/DomainError';
 import { DomainEvents } from '../domain/events/DomainEvents';
 
 export interface SolanaConfig {
@@ -83,16 +83,20 @@ export class SolanaIntegrationFacade {
       }
     );
 
-    // Initialize adapters
-    const connection = this.connectionManager.getConnection();
+    // Initialize adapters with a direct Connection object
+    // Use the first RPC endpoint for now (ConnectionManager handles failover internally)
+    const connection = new Connection(config.rpcEndpoints[0], config.commitment || 'confirmed');
     this.splTokenAdapter = new SPLTokenAdapter(connection);
     this.metaplexAdapter = new MetaplexAdapter(connection);
 
     // Initialize domain services
-    const connectionAdapter = new SolanaConnectionAdapter(
-      connection,
-      this.connectionRepository
-    );
+    const connectionAdapter = new SolanaConnectionAdapter({
+      endpoint: config.rpcEndpoints[0],
+      commitment: config.commitment || 'confirmed',
+      enableRetries: true,
+      enableCircuitBreaker: config.enableCircuitBreaker !== false,
+      maxRetries: config.maxRetries || 3
+    });
     this.balanceService = new SolanaBalanceService(
       connectionAdapter,
       this.balanceRepository
@@ -111,12 +115,7 @@ export class SolanaIntegrationFacade {
    */
   async getPortfolio(address: string): Promise<Result<PortfolioSnapshot, DomainError>> {
     try {
-      const publicKeyResult = PublicKeyVO.create(address);
-      if (publicKeyResult.isFailure) {
-        return Result.fail(publicKeyResult.error);
-      }
-
-      const publicKey = publicKeyResult.getValue();
+      const publicKey = PublicKeyVO.create(address);
       
       // Create portfolio aggregate
       const portfolioResult = PortfolioAggregate.create(publicKey.toString(), []);
@@ -160,7 +159,7 @@ export class SolanaIntegrationFacade {
       return Result.ok(snapshot);
     } catch (error) {
       return Result.fail(
-        new DomainError('PORTFOLIO_FETCH_ERROR', `Failed to fetch portfolio: ${error}`)
+        new PortfolioError(`Failed to fetch portfolio: ${error}`)
       );
     }
   }
@@ -169,12 +168,22 @@ export class SolanaIntegrationFacade {
    * Get SOL balance for a wallet
    */
   async getSolanaBalance(address: string): Promise<Result<number, DomainError>> {
-    const publicKeyResult = PublicKeyVO.create(address);
-    if (publicKeyResult.isFailure) {
-      return Result.fail(publicKeyResult.error);
+    try {
+      const publicKey = PublicKeyVO.create(address);
+      
+      const balanceResult = await this.balanceService.fetchWalletBalance(publicKey);
+      if (balanceResult.isFailure) {
+        return Result.fail(balanceResult.error);
+      }
+      
+      // Extract SOL balance from the wallet balance result
+      const walletBalance = balanceResult.getValue();
+      return Result.ok(walletBalance.nativeBalance);
+    } catch (error) {
+      return Result.fail(
+        new ValidationError(`Invalid Solana public key: ${address}`, 'publicKey', address)
+      );
     }
-
-    return this.balanceService.getBalance(publicKeyResult.getValue());
   }
 
   /**
@@ -200,7 +209,7 @@ export class SolanaIntegrationFacade {
       return Result.ok(balances);
     } catch (error) {
       return Result.fail(
-        new DomainError('TOKEN_FETCH_ERROR', `Failed to fetch tokens: ${error}`)
+        new NetworkError(`Failed to fetch tokens: ${error}`)
       );
     }
   }
@@ -214,7 +223,7 @@ export class SolanaIntegrationFacade {
       return Result.ok(nfts);
     } catch (error) {
       return Result.fail(
-        new DomainError('NFT_FETCH_ERROR', `Failed to fetch NFTs: ${error}`)
+        new NetworkError(`Failed to fetch NFTs: ${error}`)
       );
     }
   }

@@ -19,13 +19,9 @@ export class PublicKeyVO extends ValueObject<string> {
   protected validate(): void {
     try {
       this._publicKey = new PublicKey(this._value);
-      if (!PublicKey.isOnCurve(this._publicKey)) {
-        throw new InvalidPublicKeyError(this._value);
-      }
+      // Note: We don't check isOnCurve for all addresses as some valid 
+      // addresses (like program derived addresses) are off-curve
     } catch (error) {
-      if (error instanceof InvalidPublicKeyError) {
-        throw error;
-      }
       throw new InvalidPublicKeyError(this._value);
     }
   }

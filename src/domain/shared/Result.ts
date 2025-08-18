@@ -28,6 +28,19 @@ export class Result<T, E = Error> {
     return !this.success;
   }
 
+  // Getter properties for convenience
+  get isSuccess(): boolean {
+    return this.success;
+  }
+
+  get isFailure(): boolean {
+    return !this.success;
+  }
+
+  get error(): E | undefined {
+    return this._error;
+  }
+
   getValue(): T {
     if (!this.success) {
       throw new Error('Cannot get value from failed result');
