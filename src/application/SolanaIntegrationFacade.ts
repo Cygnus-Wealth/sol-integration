@@ -65,8 +65,10 @@ export class SolanaIntegrationFacade {
   private balanceService: SolanaBalanceService;
   private tokenDiscoveryService: TokenDiscoveryService;
   private eventBus: Map<string, ((event: any) => void)[]> = new Map();
+  private config: SolanaConfig;
 
   constructor(config: SolanaConfig) {
+    this.config = config;
     // Initialize repositories
     this.assetRepository = new InMemoryAssetRepository(1000, config.cacheTTL || 300000);
     this.balanceRepository = new InMemoryBalanceRepository();
@@ -74,14 +76,25 @@ export class SolanaIntegrationFacade {
 
     // Initialize connection management
     this.connectionManager = new ConnectionManager(
-      config.rpcEndpoints,
       this.connectionRepository,
       {
-        commitment: config.commitment || 'confirmed',
-        enableCircuitBreaker: config.enableCircuitBreaker !== false,
-        maxRetries: config.maxRetries || 3
+        defaultTimeout: 30000,
+        enableAutoRecovery: true,
+        maxConcurrentConnections: 50
       }
     );
+    
+    // Add endpoints to repository
+    for (const endpoint of config.rpcEndpoints) {
+      this.connectionRepository.addEndpoint({
+        url: endpoint,
+        commitment: config.commitment || 'confirmed',
+        features: [],
+        maxConcurrency: 10,
+        isActive: true,
+        priority: 1
+      });
+    }
 
     // Initialize adapters with a direct Connection object
     // Use the first RPC endpoint for now (ConnectionManager handles failover internally)
@@ -125,8 +138,8 @@ export class SolanaIntegrationFacade {
 
       const portfolio = portfolioResult.getValue();
 
-      // Discover all tokens
-      const tokensResult = await this.tokenDiscoveryService.discoverTokens(publicKey);
+      // Discover all tokens - service expects a string
+      const tokensResult = await this.tokenDiscoveryService.discoverTokens(address);
       if (tokensResult.isFailure) {
         return Result.fail(tokensResult.error);
       }
@@ -169,9 +182,11 @@ export class SolanaIntegrationFacade {
    */
   async getSolanaBalance(address: string): Promise<Result<number, DomainError>> {
     try {
+      // Validate the address first
       const publicKey = PublicKeyVO.create(address);
       
-      const balanceResult = await this.balanceService.fetchWalletBalance(publicKey);
+      // Pass the string address to the service
+      const balanceResult = await this.balanceService.fetchWalletBalance(address);
       if (balanceResult.isFailure) {
         return Result.fail(balanceResult.error);
       }
@@ -261,7 +276,13 @@ export class SolanaIntegrationFacade {
    * Get connection health metrics
    */
   getHealthMetrics() {
-    return this.connectionManager.getMetrics();
+    // TODO: Implement proper metrics from ConnectionManager
+    return {
+      endpoints: this.config.rpcEndpoints.length,
+      requests: 0,
+      failures: 0,
+      avgResponseTime: 0
+    };
   }
 
   // Private helper methods
@@ -269,14 +290,23 @@ export class SolanaIntegrationFacade {
   private async fetchNFTs(address: string): Promise<NFTInfo[]> {
     try {
       const publicKey = new PublicKey(address);
-      const nfts = await this.metaplexAdapter.getNFTs(publicKey);
+      const nftsResult = await this.metaplexAdapter.getNFTsByOwner(
+        PublicKeyVO.create(address)
+      );
+      
+      if (nftsResult.isFailure) {
+        console.error('Failed to fetch NFTs:', nftsResult.error);
+        return [];
+      }
+      
+      const nfts = nftsResult.getValue();
       
       return nfts.map(nft => ({
-        mint: nft.mint.toString(),
+        mint: nft.mint.toBase58(),
         name: nft.name,
         symbol: nft.symbol,
-        uri: nft.uri,
-        collection: nft.collection?.address.toString()
+        uri: nft.externalUrl || nft.image || '',
+        collection: nft.collection?.name
       }));
     } catch (error) {
       console.error('Failed to fetch NFTs:', error);

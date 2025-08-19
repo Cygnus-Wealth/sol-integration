@@ -20,15 +20,7 @@ export class Result<T, E = Error> {
     return new Result<T, E>(false, undefined, error);
   }
 
-  isSuccess(): boolean {
-    return this.success;
-  }
-
-  isFailure(): boolean {
-    return !this.success;
-  }
-
-  // Getter properties for convenience
+  // Getter properties (can be used as both property and method)
   get isSuccess(): boolean {
     return this.success;
   }

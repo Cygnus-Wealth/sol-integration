@@ -125,6 +125,12 @@ export class NFTParseError extends DomainError {
   }
 }
 
+export class PortfolioError extends DomainError {
+  constructor(message: string, context?: Record<string, any>) {
+    super('PORTFOLIO_ERROR', message, context);
+  }
+}
+
 export class CacheError extends DomainError {
   constructor(operation: string, reason?: string) {
     super(
