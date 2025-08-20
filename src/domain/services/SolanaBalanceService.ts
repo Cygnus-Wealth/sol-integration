@@ -156,10 +156,9 @@ export class SolanaBalanceService {
 
     } catch (error) {
       return Result.fail(
-        new DomainError(
-          'BALANCE_FETCH_ERROR',
+        new NetworkError(
           error instanceof Error ? error.message : 'Unknown error',
-          { wallet }
+          wallet
         )
       );
     }
@@ -194,7 +193,7 @@ export class SolanaBalanceService {
     }
 
     return Result.fail(
-      lastError || new DomainError('RETRY_EXHAUSTED', 'All retry attempts failed')
+      lastError || new NetworkError('All retry attempts failed', wallet.toString())
     );
   }
 
@@ -227,7 +226,7 @@ export class SolanaBalanceService {
     }
 
     return Result.fail(
-      lastError || new DomainError('RETRY_EXHAUSTED', 'All retry attempts failed')
+      lastError || new NetworkError('All retry attempts failed', wallet.toString())
     );
   }
 
@@ -366,7 +365,7 @@ export class SolanaBalanceService {
       return await this.balanceRepository.invalidateWallet(walletKey);
     } catch (error) {
       return Result.fail(
-        new DomainError('CACHE_INVALIDATION_ERROR', 'Failed to invalidate cache')
+        new CacheError('invalidate', 'Failed to invalidate cache')
       );
     }
   }
