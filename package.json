@@ -26,6 +26,14 @@
   ],
   "author": "CygnusWealth",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cygnus-Wealth/sol-integration.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.7.0",
@@ -38,7 +46,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@cygnus-wealth/data-models": "file:../data-models",
+    "@cygnus-wealth/data-models": "^1.0.0",
     "@metaplex-foundation/js": "^0.20.1",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.4"
