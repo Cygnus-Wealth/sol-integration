@@ -40,3 +40,9 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+# Gas Town (added by gt)
+.runtime/
+.claude/
+.beads/
+.logs/
