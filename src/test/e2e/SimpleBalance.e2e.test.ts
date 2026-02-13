@@ -1,14 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getNetworkConfig } from '../../config/networks';
 
 /**
  * Simple E2E test for Solana balance fetching
  * This test directly uses Solana Web3.js to verify testnet connectivity
  */
 describe('Simple Solana Balance E2E Test', () => {
-  // Testnet RPC endpoints
+  // Solana testnet (distinct from devnet — not part of NetworkEnvironment mapping)
   const TESTNET_URL = 'https://api.testnet.solana.com';
-  const DEVNET_URL = 'https://api.devnet.solana.com';
+  // Devnet URL resolved from network config (testnet environment → devnet cluster)
+  const DEVNET_URL = getNetworkConfig('testnet').clusterUrl;
   
   // Known test wallets
   const TEST_WALLETS = {

@@ -20,6 +20,7 @@ export interface ConnectionConfig {
   timeout?: number;
   wsEndpoint?: string;
   httpHeaders?: Record<string, string>;
+  network?: 'mainnet-beta' | 'testnet' | 'devnet';
   enableRetries?: boolean;
   enableCircuitBreaker?: boolean;
   maxRetries?: number;

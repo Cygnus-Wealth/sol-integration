@@ -35,6 +35,16 @@ export { IAssetRepository } from './domain/repositories/IAssetRepository';
 export { IBalanceRepository } from './domain/repositories/IBalanceRepository';
 export { IConnectionRepository } from './domain/repositories/IConnectionRepository';
 
+// Network Configuration
+export {
+  NetworkEnvironment,
+  NetworkConfig,
+  NETWORK_CONFIGS,
+  getNetworkConfig,
+  getDefaultEndpoints,
+  resolveEndpoints
+} from './config/networks';
+
 // Default export for convenience
 import { SolanaIntegrationFacade } from './application/SolanaIntegrationFacade';
 export default SolanaIntegrationFacade;

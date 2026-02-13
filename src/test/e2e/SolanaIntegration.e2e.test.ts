@@ -1,20 +1,21 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Connection, PublicKey, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
 import { SolanaIntegrationFacade } from '../../application/SolanaIntegrationFacade';
+import { getDefaultEndpoints, getNetworkConfig } from '../../config/networks';
 
 /**
  * E2E Tests for Solana Integration
  * These tests interact with Solana Testnet/Devnet
- * 
+ *
  * To run these tests:
  * npm run test:e2e
- * 
+ *
  * Note: These tests require network access and may be slower than unit tests
  */
 describe('Solana Integration E2E Tests', () => {
   let facade: SolanaIntegrationFacade;
   let connection: Connection;
-  
+
   // Test wallets with known balances on testnet/devnet
   // These are public addresses used for testing
   const TEST_WALLETS = {
@@ -30,17 +31,13 @@ describe('Solana Integration E2E Tests', () => {
     INVALID_ADDRESS: 'invalid-address-123'
   };
 
-  // Testnet/Devnet RPC endpoints
-  const RPC_ENDPOINTS = [
-    'https://api.devnet.solana.com',
-    'https://rpc.ankr.com/solana_devnet',
-    'https://solana-devnet.g.alchemy.com/v2/demo'
-  ];
+  // RPC endpoints resolved from network config
+  const RPC_ENDPOINTS = getDefaultEndpoints('testnet');
 
   beforeAll(() => {
-    // Initialize facade with testnet configuration
+    // Initialize facade with testnet environment
     facade = new SolanaIntegrationFacade({
-      rpcEndpoints: RPC_ENDPOINTS,
+      environment: 'testnet',
       commitment: 'confirmed',
       cacheTTL: 5000, // Short cache for testing
       maxRetries: 2,
@@ -49,7 +46,7 @@ describe('Solana Integration E2E Tests', () => {
     });
 
     // Initialize direct connection for validation
-    connection = new Connection(RPC_ENDPOINTS[0], 'confirmed');
+    connection = new Connection(getNetworkConfig('testnet').clusterUrl, 'confirmed');
   });
 
   afterAll(() => {

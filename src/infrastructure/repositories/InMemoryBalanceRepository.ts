@@ -22,13 +22,15 @@ export class InMemoryBalanceRepository implements IBalanceRepository {
   private metrics: CacheMetrics = { hits: 0, misses: 0, evictions: 0 };
   private readonly maxEntries: number;
   private readonly defaultTTL: number = 30000; // 30 seconds
+  private readonly environment: string;
 
-  constructor(maxEntries: number = 1000) {
+  constructor(maxEntries: number = 1000, environment: string = 'testnet') {
     this.maxEntries = maxEntries;
+    this.environment = environment;
   }
 
   private getCacheKey(wallet: PublicKeyVO, mint: PublicKeyVO): string {
-    return `${wallet.toBase58()}:${mint.toBase58()}`;
+    return `${this.environment}:${wallet.toBase58()}:${mint.toBase58()}`;
   }
 
   private updateAccessOrder(key: string): void {
@@ -90,11 +92,11 @@ export class InMemoryBalanceRepository implements IBalanceRepository {
     wallet: PublicKeyVO
   ): Promise<Result<BalanceCacheEntry[], DomainError>> {
     try {
-      const walletPrefix = wallet.toBase58();
+      const walletPrefix = `${this.environment}:${wallet.toBase58()}:`;
       const entries: BalanceCacheEntry[] = [];
 
       for (const [key, entry] of this.cache.entries()) {
-        if (key.startsWith(walletPrefix + ':')) {
+        if (key.startsWith(walletPrefix)) {
           if (!this.isExpired(entry)) {
             entries.push(entry);
             this.updateAccessOrder(key);
@@ -193,11 +195,11 @@ export class InMemoryBalanceRepository implements IBalanceRepository {
 
   async invalidateWallet(wallet: PublicKeyVO): Promise<Result<void, DomainError>> {
     try {
-      const walletPrefix = wallet.toBase58();
+      const walletPrefix = `${this.environment}:${wallet.toBase58()}:`;
       const keysToDelete: string[] = [];
 
       for (const key of this.cache.keys()) {
-        if (key.startsWith(walletPrefix + ':')) {
+        if (key.startsWith(walletPrefix)) {
           keysToDelete.push(key);
         }
       }

@@ -16,9 +16,11 @@ import { TokenAmount } from '../domain/asset/valueObjects/TokenAmount';
 import { Result } from '../domain/shared/Result';
 import { DomainError, ValidationError, NetworkError, PortfolioError } from '../domain/shared/DomainError';
 import { DomainEvents } from '../domain/events/DomainEvents';
+import { NetworkEnvironment, resolveEndpoints, getNetworkConfig } from '../config/networks';
 
 export interface SolanaConfig {
-  rpcEndpoints: string[];
+  environment?: NetworkEnvironment;
+  rpcEndpoints?: string[];
   commitment?: 'processed' | 'confirmed' | 'finalized';
   cacheTTL?: number;
   maxRetries?: number;
@@ -66,12 +68,18 @@ export class SolanaIntegrationFacade {
   private tokenDiscoveryService: TokenDiscoveryService;
   private eventBus: Map<string, ((event: any) => void)[]> = new Map();
   private config: SolanaConfig;
+  private environment: NetworkEnvironment;
+  private resolvedEndpoints: string[];
 
   constructor(config: SolanaConfig) {
     this.config = config;
+    this.environment = config.environment || 'testnet';
+    this.resolvedEndpoints = resolveEndpoints(this.environment, config.rpcEndpoints);
+    const networkConfig = getNetworkConfig(this.environment);
+
     // Initialize repositories
     this.assetRepository = new InMemoryAssetRepository(1000, config.cacheTTL || 300000);
-    this.balanceRepository = new InMemoryBalanceRepository();
+    this.balanceRepository = new InMemoryBalanceRepository(1000, this.environment);
     this.connectionRepository = new SolanaConnectionRepository();
 
     // Initialize connection management
@@ -83,29 +91,31 @@ export class SolanaIntegrationFacade {
         maxConcurrentConnections: 50
       }
     );
-    
+
     // Add endpoints to repository
-    for (const endpoint of config.rpcEndpoints) {
+    for (let i = 0; i < this.resolvedEndpoints.length; i++) {
       this.connectionRepository.addEndpoint({
-        url: endpoint,
-        commitment: config.commitment || 'confirmed',
+        url: this.resolvedEndpoints[i],
+        name: `${networkConfig.clusterName}-${i}`,
+        network: networkConfig.clusterName,
         features: [],
         maxConcurrency: 10,
+        timeoutMs: 30000,
         isActive: true,
         priority: 1
       });
     }
 
     // Initialize adapters with a direct Connection object
-    // Use the first RPC endpoint for now (ConnectionManager handles failover internally)
-    const connection = new Connection(config.rpcEndpoints[0], config.commitment || 'confirmed');
+    const connection = new Connection(this.resolvedEndpoints[0], config.commitment || 'confirmed');
     this.splTokenAdapter = new SPLTokenAdapter(connection);
     this.metaplexAdapter = new MetaplexAdapter(connection);
 
     // Initialize domain services
     const connectionAdapter = new SolanaConnectionAdapter({
-      endpoint: config.rpcEndpoints[0],
+      endpoint: this.resolvedEndpoints[0],
       commitment: config.commitment || 'confirmed',
+      network: networkConfig.clusterName,
       enableRetries: true,
       enableCircuitBreaker: config.enableCircuitBreaker !== false,
       maxRetries: config.maxRetries || 3
@@ -278,7 +288,7 @@ export class SolanaIntegrationFacade {
   getHealthMetrics() {
     // TODO: Implement proper metrics from ConnectionManager
     return {
-      endpoints: this.config.rpcEndpoints.length,
+      endpoints: this.resolvedEndpoints.length,
       requests: 0,
       failures: 0,
       avgResponseTime: 0
