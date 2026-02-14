@@ -26,7 +26,7 @@ describe('CircuitBreaker', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllTimers();
+    vi.useRealTimers();
   });
 
   describe('Circuit States', () => {
@@ -47,7 +47,7 @@ describe('CircuitBreaker', () => {
       // Trigger failures to reach threshold
       for (let i = 0; i < config.failureThreshold; i++) {
         const result = await circuitBreaker.execute(failingOperation);
-        expect(result.isFailure()).toBe(true);
+        expect(result.isFailure).toBe(true);
       }
 
       expect(circuitBreaker.getState()).toBe(CircuitState.OPEN);
@@ -61,7 +61,7 @@ describe('CircuitBreaker', () => {
       circuitBreaker.forceOpen('Manual test');
       
       const result = await circuitBreaker.execute(operation);
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(operation).not.toHaveBeenCalled();
     });
 
@@ -81,7 +81,7 @@ describe('CircuitBreaker', () => {
       // Next call should attempt to execute
       const result = await circuitBreaker.execute(successOperation);
       expect(circuitBreaker.getState()).toBe(CircuitState.HALF_OPEN);
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
     });
 
     it('should close after successful operations in HALF_OPEN', async () => {
@@ -94,7 +94,7 @@ describe('CircuitBreaker', () => {
       // Execute successful operations to meet success threshold
       for (let i = 0; i < config.successThreshold; i++) {
         const result = await circuitBreaker.execute(operation);
-        expect(result.isSuccess()).toBe(true);
+        expect(result.isSuccess).toBe(true);
       }
 
       expect(circuitBreaker.getState()).toBe(CircuitState.CLOSED);
@@ -113,7 +113,7 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.isHalfOpen()).toBe(true);
 
       const result = await circuitBreaker.execute(failingOperation);
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(circuitBreaker.isOpen()).toBe(true);
     });
   });
@@ -128,19 +128,21 @@ describe('CircuitBreaker', () => {
       
       const result = await circuitBreaker.execute(operation);
       
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBe('test result');
       expect(operation).toHaveBeenCalledTimes(1);
     });
 
     it('should handle operation timeout', async () => {
-      const slowOperation = vi.fn().mockImplementation(() => 
+      const slowOperation = vi.fn().mockImplementation(() =>
         new Promise(resolve => setTimeout(resolve, config.timeout + 1000))
       );
 
-      const result = await circuitBreaker.execute(slowOperation);
-      
-      expect(result.isFailure()).toBe(true);
+      const promise = circuitBreaker.execute(slowOperation);
+      await vi.advanceTimersByTimeAsync(config.timeout + 100);
+      const result = await promise;
+
+      expect(result.isFailure).toBe(true);
       expect(result.getError().message).toContain('timed out');
     });
 
@@ -150,7 +152,7 @@ describe('CircuitBreaker', () => {
 
       const result = await circuitBreaker.execute(failingOperation);
       
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError().message).toContain('Operation error');
     });
 
@@ -163,7 +165,7 @@ describe('CircuitBreaker', () => {
 
       const result = await circuitBreaker.execute(operation, fallback);
       
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBe('fallback result');
       expect(operation).not.toHaveBeenCalled();
       expect(fallback).toHaveBeenCalledTimes(1);
@@ -176,7 +178,7 @@ describe('CircuitBreaker', () => {
 
       const result = await circuitBreaker.execute(operation);
       
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe('CIRCUIT_BREAKER_OPEN');
     });
   });
@@ -210,18 +212,23 @@ describe('CircuitBreaker', () => {
         return 'success';
       });
 
-      await circuitBreaker.execute(operation);
-      
+      const promise = circuitBreaker.execute(operation);
+      await vi.advanceTimersByTimeAsync(200);
+      await promise;
+
       const metrics = circuitBreaker.getMetrics();
       expect(metrics.averageExecutionTime).toBeGreaterThan(0);
     });
 
     it('should track state change times', async () => {
       const initialTime = circuitBreaker.getMetrics().stateChangeTime;
-      
+
+      // Advance time so state change has a different timestamp
+      vi.advanceTimersByTime(1);
+
       // Force state change
       circuitBreaker.forceOpen('Test');
-      
+
       const newTime = circuitBreaker.getMetrics().stateChangeTime;
       expect(newTime.getTime()).toBeGreaterThan(initialTime.getTime());
     });
@@ -399,18 +406,16 @@ describe('CircuitBreaker', () => {
       
       const result = await circuitBreaker.execute(operation);
       
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBeUndefined();
     });
 
     it('should handle operations that throw non-Error objects', async () => {
-      const operation = vi.fn().mockImplementation(() => {
-        throw 'String error';
-      });
-      
+      const operation = vi.fn().mockRejectedValue('String error');
+
       const result = await circuitBreaker.execute(operation);
-      
-      expect(result.isFailure()).toBe(true);
+
+      expect(result.isFailure).toBe(true);
       expect(result.getError().message).toContain('String error');
     });
   });
@@ -430,7 +435,7 @@ describe('CircuitBreaker', () => {
       const results = await Promise.all(promises);
       
       results.forEach(result => {
-        expect(result.isSuccess()).toBe(true);
+        expect(result.isSuccess).toBe(true);
       });
       
       expect(operation).toHaveBeenCalledTimes(10);
@@ -446,7 +451,7 @@ describe('CircuitBreaker', () => {
       const results = await Promise.all(promises);
       
       results.forEach(result => {
-        expect(result.isFailure()).toBe(true);
+        expect(result.isFailure).toBe(true);
       });
       
       // Circuit should be open after threshold failures

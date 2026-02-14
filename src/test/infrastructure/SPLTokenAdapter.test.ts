@@ -7,13 +7,55 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, getAssociatedTokenAddress, AccountLayout } from '@solana/spl-token';
 import { SPLTokenAdapter } from '../../infrastructure/adapters/SPLTokenAdapter';
 import { PublicKeyVO } from '../../domain/asset/valueObjects/PublicKeyVO';
 
-// Mock the Solana dependencies
-vi.mock('@solana/web3.js');
-vi.mock('@solana/spl-token');
+// Mock the Solana dependencies with manual factories to avoid BN.js issues
+vi.mock('@solana/web3.js', () => {
+  class MockPublicKey {
+    private _key: string;
+    constructor(value: string | Uint8Array | number[]) {
+      if (typeof value === 'string') {
+        this._key = value;
+      } else {
+        this._key = Buffer.from(value as Uint8Array).toString('hex');
+      }
+    }
+    toBase58() { return this._key; }
+    toString() { return this._key; }
+    toBuffer() { return Buffer.alloc(32); }
+    toBytes() { return new Uint8Array(32); }
+    equals(other: any) { return this.toBase58() === other?.toBase58?.(); }
+  }
+
+  return {
+    Connection: vi.fn(),
+    PublicKey: MockPublicKey,
+    AccountInfo: {},
+    LAMPORTS_PER_SOL: 1000000000,
+    SystemProgram: { programId: new MockPublicKey('11111111111111111111111111111111') },
+  };
+});
+
+vi.mock('@solana/spl-token', () => {
+  return {
+    TOKEN_PROGRAM_ID: { toBase58: () => 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', toString: () => 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
+    TOKEN_2022_PROGRAM_ID: { toBase58: () => 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb', toString: () => 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' },
+    ASSOCIATED_TOKEN_PROGRAM_ID: { toBase58: () => 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL', toString: () => 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' },
+    NATIVE_MINT: { toBase58: () => 'So11111111111111111111111111111111111111112', toString: () => 'So11111111111111111111111111111111111111112' },
+    getAssociatedTokenAddress: vi.fn(),
+    getAccount: vi.fn(),
+    getMint: vi.fn(),
+    TokenAccountNotFoundError: class TokenAccountNotFoundError extends Error {
+      constructor() { super('Token account not found'); this.name = 'TokenAccountNotFoundError'; }
+    },
+    TokenInvalidMintError: class TokenInvalidMintError extends Error {
+      constructor() { super('Invalid mint'); this.name = 'TokenInvalidMintError'; }
+    },
+    AccountLayout: { decode: vi.fn(), span: 165 },
+  };
+});
 
 describe('SPLTokenAdapter', () => {
   let adapter: SPLTokenAdapter;
@@ -56,7 +98,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.findAssociatedTokenAccount(owner, mint);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const ataInfo = result.getValue();
       expect(ataInfo.exists).toBe(true);
       expect(ataInfo.needsCreation).toBe(false);
@@ -74,7 +116,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.findAssociatedTokenAccount(owner, mint);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const ataInfo = result.getValue();
       expect(ataInfo.exists).toBe(false);
       expect(ataInfo.needsCreation).toBe(true);
@@ -88,7 +130,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.findAssociatedTokenAccount(owner, mint);
 
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe('TOKEN_ACCOUNT_ERROR');
     });
   });
@@ -127,7 +169,7 @@ describe('SPLTokenAdapter', () => {
       const tokenAccount = PublicKeyVO.create(tokenAccountKey);
       const result = await adapter.getTokenAccount(tokenAccount);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const accountData = result.getValue();
       expect(accountData.mint.toBase58()).toBe(mintKey);
       expect(accountData.owner.toBase58()).toBe(ownerKey);
@@ -145,7 +187,7 @@ describe('SPLTokenAdapter', () => {
       const tokenAccount = PublicKeyVO.create('nonexistent-account');
       const result = await adapter.getTokenAccount(tokenAccount);
 
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe('TOKEN_ACCOUNT_ERROR');
       expect(result.getError().message).toContain('not found');
     });
@@ -169,7 +211,7 @@ describe('SPLTokenAdapter', () => {
       const mint = PublicKeyVO.create(mintKey);
       const result = await adapter.getMint(mint);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const mintData = result.getValue();
       expect(mintData.address.toBase58()).toBe(mintKey);
       expect(mintData.decimals).toBe(6);
@@ -184,7 +226,7 @@ describe('SPLTokenAdapter', () => {
       const mint = PublicKeyVO.create('invalid-mint');
       const result = await adapter.getMint(mint);
 
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe('VALIDATION_ERROR');
     });
 
@@ -203,7 +245,7 @@ describe('SPLTokenAdapter', () => {
       const mint = PublicKeyVO.create(mintKey);
       const result = await adapter.validateMint(mint);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const validation = result.getValue();
       expect(validation.isValid).toBe(true);
       expect(validation.decimals).toBe(6);
@@ -217,7 +259,7 @@ describe('SPLTokenAdapter', () => {
       const mint = PublicKeyVO.create('invalid-mint');
       const result = await adapter.validateMint(mint);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const validation = result.getValue();
       expect(validation.isValid).toBe(false);
       expect(validation.hasAuthority).toBe(false);
@@ -265,7 +307,7 @@ describe('SPLTokenAdapter', () => {
       const owner = PublicKeyVO.create(ownerKey);
       const result = await adapter.getTokenAccountsByOwner(owner);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const accounts = result.getValue();
       expect(accounts).toHaveLength(1);
       expect(accounts[0].owner.toBase58()).toBe(ownerKey);
@@ -311,7 +353,7 @@ describe('SPLTokenAdapter', () => {
       const owner = PublicKeyVO.create(ownerKey);
       const result = await adapter.discoverAllTokenAccounts(owner);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const discovery = result.getValue();
       expect(discovery.legacyTokens).toHaveLength(1);
       expect(discovery.token2022).toHaveLength(1);
@@ -350,7 +392,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.getAssociatedTokenAccountBalance(owner, mint);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const balance = result.getValue();
       expect(balance.exists).toBe(true);
       expect(balance.balance?.getAmount()).toBe('1000000');
@@ -373,7 +415,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.getAssociatedTokenAccountBalance(owner, mint);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const balance = result.getValue();
       expect(balance.exists).toBe(false);
       expect(balance.balance).toBeUndefined();
@@ -398,23 +440,11 @@ describe('SPLTokenAdapter', () => {
 
       mockConnection.getMultipleAccountsInfo.mockResolvedValue(mockAccountInfos as any);
 
-      // Mock AccountLayout.decode
-      const mockAccountLayout = {
-        decode: vi.fn().mockReturnValue({
-          mint: new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
-          amount: BigInt(1000000)
-        }),
-        span: 165
-      };
-
-      // We need to mock the AccountLayout import
-      vi.doMock('@solana/spl-token', async (importOriginal) => {
-        const original = await importOriginal();
-        return {
-          ...original,
-          AccountLayout: mockAccountLayout
-        };
-      });
+      // Configure the already-mocked AccountLayout.decode to return valid token data
+      vi.mocked(AccountLayout.decode).mockReturnValue({
+        mint: new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
+        amount: BigInt(1000000)
+      } as any);
 
       // Mock getMintDecimals to return a valid decimal count
       const getMintDecimalsSpy = vi.fn().mockResolvedValue(6);
@@ -422,7 +452,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.getMultipleTokenAccountBalances(accounts);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const balances = result.getValue();
       expect(balances.size).toBe(1); // Only one valid account
     });
@@ -454,7 +484,7 @@ describe('SPLTokenAdapter', () => {
         expectedMint
       );
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBe(true);
     });
 
@@ -474,7 +504,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.validateTokenAccountOwnership(tokenAccount, expectedOwner);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBe(false);
     });
 
@@ -491,7 +521,7 @@ describe('SPLTokenAdapter', () => {
       const tokenAccount = PublicKeyVO.create(tokenAccountKey);
       const result = await adapter.getTokenAccountState(tokenAccount);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const state = result.getValue();
       expect(state.state).toBe('frozen');
       expect(state.isFrozen).toBe(true);
@@ -531,7 +561,7 @@ describe('SPLTokenAdapter', () => {
       const owner = PublicKeyVO.create('Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr');
       const result = await adapter.getTokenAccountsByOwner(owner);
 
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe('NETWORK_ERROR');
       expect(result.getError().message).toContain('Network error');
     });
@@ -554,7 +584,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.getTokenAccountsByOwners(owners);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const results = result.getValue();
       expect(results.size).toBe(1); // Only successful result
     });
@@ -568,7 +598,7 @@ describe('SPLTokenAdapter', () => {
 
       // The result depends on the underlying implementation
       // If getAssociatedTokenAddress throws, it should be caught
-      expect(result.isSuccess() || result.isFailure()).toBe(true);
+      expect(result.isSuccess || result.isFailure).toBe(true);
     });
   });
 
@@ -585,7 +615,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.getMultipleTokenAccountBalances(accounts);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       // Should handle batch processing without errors
       expect(mockConnection.getMultipleAccountsInfo).toHaveBeenCalled();
     });
@@ -604,7 +634,7 @@ describe('SPLTokenAdapter', () => {
 
       const result = await adapter.getTokenAccountsByOwners(owners);
 
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       // Should process in batches of 10, so 3 calls total
       expect(mockGetTokenAccountsByOwner).toHaveBeenCalledTimes(25);
     });

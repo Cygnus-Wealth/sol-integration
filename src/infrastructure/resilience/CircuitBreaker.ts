@@ -101,14 +101,15 @@ export class CircuitBreaker {
       const executionTime = Date.now() - startTime;
       this.onFailure(error as Error, executionTime);
       
+      const errorMessage = error instanceof Error ? error.message : String(error);
       return Result.fail(
         new OperationError(
           'CIRCUIT_BREAKER_FAILURE',
-          `Operation failed in circuit breaker '${this.name}': ${(error as Error).message}`,
-          { 
+          `Operation failed in circuit breaker '${this.name}': ${errorMessage}`,
+          {
             circuitState: this.state,
             failureCount: this.failureCount,
-            error: error instanceof Error ? error.message : String(error)
+            error: errorMessage
           }
         )
       );
@@ -152,7 +153,8 @@ export class CircuitBreaker {
   private onSuccess(executionTime: number): void {
     this.recordExecutionTime(executionTime);
     this.lastSuccessTime = new Date();
-    
+    this.successCount++;
+
     if (this.config.onSuccess) {
       this.config.onSuccess(executionTime);
     }
@@ -161,9 +163,8 @@ export class CircuitBreaker {
       case CircuitState.CLOSED:
         this.resetFailureCount();
         break;
-        
+
       case CircuitState.HALF_OPEN:
-        this.successCount++;
         if (this.successCount >= this.config.successThreshold) {
           this.moveToClosed();
         }
@@ -177,14 +178,14 @@ export class CircuitBreaker {
   private onFailure(error: Error, executionTime: number): void {
     this.recordExecutionTime(executionTime);
     this.lastFailureTime = new Date();
-    
+    this.failureCount++;
+
     if (this.config.onFailure) {
       this.config.onFailure(error, executionTime);
     }
 
-    this.failureCount++;
-    
-    if (this.shouldOpen()) {
+    // In HALF_OPEN, any failure immediately opens the circuit
+    if (this.state === CircuitState.HALF_OPEN || this.shouldOpen()) {
       this.moveToOpen();
     }
   }

@@ -220,8 +220,8 @@ export class RetryPolicy {
    */
   private isRetryableError(error: Error): boolean {
     // Check specific error types that are generally retryable
-    if (error instanceof NetworkError && error.retryable) {
-      return true;
+    if (error instanceof NetworkError) {
+      return error.retryable === true;
     }
     
     if (error instanceof TimeoutError) {
@@ -264,11 +264,12 @@ export class RetryPolicy {
       return error;
     }
     
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return new OperationError(
       'OPERATION_FAILED',
-      `Operation '${this.name}' failed after ${attempts} attempts: ${error.message}`,
-      { 
-        originalError: error.message,
+      `Operation '${this.name}' failed after ${attempts} attempts: ${errorMessage}`,
+      {
+        originalError: errorMessage,
         attempts,
         retryPolicy: this.name
       }
