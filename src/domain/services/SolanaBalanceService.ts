@@ -11,7 +11,7 @@ import { SolanaAsset } from '../asset/aggregates/SolanaAsset';
 import { IAssetRepository } from '../repositories/IAssetRepository';
 import { IBalanceRepository, BalanceSnapshot } from '../repositories/IBalanceRepository';
 import { Result } from '../shared/Result';
-import { DomainError, NetworkError, TimeoutError } from '../shared/DomainError';
+import { DomainError, NetworkError, TimeoutError, CacheError } from '../shared/DomainError';
 
 export interface WalletBalance {
   wallet: PublicKeyVO;

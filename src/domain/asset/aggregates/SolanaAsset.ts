@@ -74,7 +74,7 @@ export class SolanaAsset {
     return new SolanaAsset({
       id: `spl-${mint}`,
       mint: mintKey,
-      type: AssetType.TOKEN,
+      type: AssetType.CRYPTOCURRENCY,
       metadata: {
         ...metadata,
         decimals: decimals || metadata.decimals
@@ -98,7 +98,7 @@ export class SolanaAsset {
     return new SolanaAsset({
       id: `spl-${mint}`,
       mint: mintKey,
-      type: AssetType.TOKEN,
+      type: AssetType.CRYPTOCURRENCY,
       metadata: {
         name: metadata.name,
         symbol: metadata.symbol,
@@ -235,7 +235,7 @@ export class SolanaAsset {
   }
 
   isToken(): boolean {
-    return this._data.type === AssetType.TOKEN;
+    return this._data.type === AssetType.CRYPTOCURRENCY;
   }
 
   isNFT(): boolean {

@@ -119,15 +119,18 @@ export class SPLTokenAdapter {
         programId.toPublicKey()
       );
 
+      const mintVO = PublicKeyVO.fromPublicKey(account.mint);
+      const decimals = await this.getMintDecimals(mintVO);
+
       const tokenAccountData: TokenAccountData = {
         address: tokenAccount,
-        mint: PublicKeyVO.fromPublicKey(account.mint),
+        mint: mintVO,
         owner: PublicKeyVO.fromPublicKey(account.owner),
-        amount: TokenAmount.fromLamports(account.amount.toString(), await this.getMintDecimals(PublicKeyVO.fromPublicKey(account.mint))),
+        amount: TokenAmount.fromTokenUnits(account.amount.toString(), decimals),
         delegate: account.delegate ? PublicKeyVO.fromPublicKey(account.delegate) : undefined,
         state: account.isFrozen ? 'frozen' : 'initialized',
         isNative: account.isNative,
-        delegatedAmount: TokenAmount.fromLamports(account.delegatedAmount.toString(), await this.getMintDecimals(PublicKeyVO.fromPublicKey(account.mint))),
+        delegatedAmount: TokenAmount.fromTokenUnits(account.delegatedAmount.toString(), decimals),
         closeAuthority: account.closeAuthority ? PublicKeyVO.fromPublicKey(account.closeAuthority) : undefined,
         programId
       };
@@ -219,13 +222,13 @@ export class SPLTokenAdapter {
     programId: PublicKeyVO = PublicKeyVO.fromPublicKey(TOKEN_PROGRAM_ID)
   ): Promise<Result<TokenAccountData[], DomainError>> {
     try {
-      const filters = mint 
-        ? [{ mint: mint.toPublicKey() }]
-        : [{ programId: programId.toPublicKey() }];
+      const filter = mint
+        ? { mint: mint.toPublicKey() }
+        : { programId: programId.toPublicKey() };
 
       const response = await this.connection.getTokenAccountsByOwner(
         owner.toPublicKey(),
-        ...filters
+        filter
       );
 
       const tokenAccounts: TokenAccountData[] = [];
@@ -415,7 +418,7 @@ export class SPLTokenAdapter {
             try {
               const accountData = AccountLayout.decode(accountInfo.data);
               const mintResult = await this.getMintDecimals(PublicKeyVO.fromPublicKey(accountData.mint));
-              const amount = TokenAmount.fromLamports(accountData.amount.toString(), mintResult);
+              const amount = TokenAmount.fromTokenUnits(accountData.amount.toString(), mintResult);
               balances.set(accountAddress.toBase58(), amount);
             } catch (error) {
               // Skip invalid accounts

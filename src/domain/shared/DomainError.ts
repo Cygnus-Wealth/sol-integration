@@ -62,7 +62,9 @@ export class RPCError extends NetworkError {
     public readonly rpcMessage?: string
   ) {
     super(message, endpoint, true);
-    this.context = { ...this.context, rpcCode, rpcMessage };
+    // Update context through a new object since it's readonly
+    const newContext = { ...super.context, rpcCode, rpcMessage };
+    Object.defineProperty(this, 'context', { value: newContext, writable: false });
   }
 }
 
@@ -73,7 +75,8 @@ export class TimeoutError extends NetworkError {
       endpoint,
       true
     );
-    this.context = { ...this.context, operation, timeoutMs };
+    const newContext = { ...super.context, operation, timeoutMs };
+    Object.defineProperty(this, 'context', { value: newContext, writable: false });
   }
 }
 
@@ -164,7 +167,8 @@ export class RPCConnectionError extends NetworkError {
     public readonly connectionType: 'websocket' | 'http' = 'http'
   ) {
     super(message, endpoint, true);
-    this.context = { ...this.context, connectionType };
+    const newContext = { ...super.context, connectionType };
+    Object.defineProperty(this, 'context', { value: newContext, writable: false });
   }
 }
 
@@ -206,12 +210,13 @@ export class RateLimitError extends NetworkError {
       endpoint,
       true
     );
-    this.context = { 
-      ...this.context, 
-      operation, 
+    const newContext = {
+      ...super.context,
+      operation,
       resetTime: resetTime?.toISOString(),
-      remainingQuota 
+      remainingQuota
     };
+    Object.defineProperty(this, 'context', { value: newContext, writable: false });
   }
 }
 

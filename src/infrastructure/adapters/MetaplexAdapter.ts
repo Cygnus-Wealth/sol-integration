@@ -5,7 +5,7 @@
  * Supports Metaplex standards and various NFT metadata formats.
  */
 
-import { Metaplex, keypairIdentity, bundlrStorage } from '@metaplex-foundation/js';
+import { Metaplex, keypairIdentity } from '@metaplex-foundation/js';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { PublicKeyVO } from '../../domain/asset/valueObjects/PublicKeyVO';
 import { Result } from '../../domain/shared/Result';
@@ -95,10 +95,8 @@ export class MetaplexAdapter {
     this.metaplex = Metaplex.make(connection)
       .use(keypairIdentity(dummyKeypair));
 
-    // Add storage if specified (not needed for read-only operations)
-    if (config?.useStorage) {
-      this.metaplex.use(bundlrStorage());
-    }
+    // Storage configuration removed - bundlrStorage deprecated in newer Metaplex versions
+    // Read-only operations don't require storage plugins
 
     // Initialize caches
     this.metadataCache = new LRUCache({

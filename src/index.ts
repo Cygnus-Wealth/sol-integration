@@ -13,8 +13,11 @@ export { TokenAmount } from './domain/asset/valueObjects/TokenAmount';
 export { TokenMetadata } from './domain/asset/valueObjects/TokenMetadata';
 
 // Domain Entities
-export { SolanaAsset, AssetType } from './domain/asset/aggregates/SolanaAsset';
+export { SolanaAsset } from './domain/asset/aggregates/SolanaAsset';
 export { NFTAsset, NFTAttribute } from './domain/asset/entities/NFTAsset';
+
+// Re-export AssetType from data-models for convenience
+export { AssetType } from '@cygnus-wealth/data-models';
 
 // Domain Aggregates
 export { PortfolioAggregate } from './domain/portfolio/aggregates/PortfolioAggregate';
@@ -24,7 +27,7 @@ export { SolanaBalanceService } from './domain/services/SolanaBalanceService';
 export { TokenDiscoveryService } from './domain/services/TokenDiscoveryService';
 
 // Domain Events
-export { DomainEvents } from './domain/events/DomainEvents';
+export { DomainEvent } from './domain/events/DomainEvents';
 
 // Shared Domain
 export { Result } from './domain/shared/Result';

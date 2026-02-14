@@ -15,7 +15,7 @@ import { NFTAsset } from '../domain/asset/entities/NFTAsset';
 import { TokenAmount } from '../domain/asset/valueObjects/TokenAmount';
 import { Result } from '../domain/shared/Result';
 import { DomainError, ValidationError, NetworkError, PortfolioError } from '../domain/shared/DomainError';
-import { DomainEvents } from '../domain/events/DomainEvents';
+import { DomainEvent } from '../domain/events/DomainEvents';
 import { NetworkEnvironment, resolveEndpoints, getNetworkConfig } from '../config/networks';
 
 export interface SolanaConfig {
@@ -78,7 +78,10 @@ export class SolanaIntegrationFacade {
     const networkConfig = getNetworkConfig(this.environment);
 
     // Initialize repositories
-    this.assetRepository = new InMemoryAssetRepository(1000, config.cacheTTL || 300000);
+    this.assetRepository = new InMemoryAssetRepository({
+      maxAssets: 1000,
+      assetCacheTTL: config.cacheTTL || 300000
+    });
     this.balanceRepository = new InMemoryBalanceRepository(1000, this.environment);
     this.connectionRepository = new SolanaConnectionRepository();
 
@@ -122,11 +125,12 @@ export class SolanaIntegrationFacade {
     });
     this.balanceService = new SolanaBalanceService(
       connectionAdapter,
+      this.assetRepository,
       this.balanceRepository
     );
     this.tokenDiscoveryService = new TokenDiscoveryService(
-      this.assetRepository,
-      this.balanceService
+      connectionAdapter as any, // TODO: Fix interface - SolanaConnectionAdapter should implement ITokenDiscoveryConnection
+      this.assetRepository
     );
 
     // Subscribe to domain events
@@ -141,41 +145,47 @@ export class SolanaIntegrationFacade {
       const publicKey = PublicKeyVO.create(address);
       
       // Create portfolio aggregate
-      const portfolioResult = PortfolioAggregate.create(publicKey.toString(), []);
-      if (portfolioResult.isFailure) {
-        return Result.fail(portfolioResult.error);
-      }
-
-      const portfolio = portfolioResult.getValue();
+      const portfolio = PortfolioAggregate.create(publicKey.toString());
 
       // Discover all tokens - service expects a string
-      const tokensResult = await this.tokenDiscoveryService.discoverTokens(address);
-      if (tokensResult.isFailure) {
-        return Result.fail(tokensResult.error);
+      const discoveryResult = await this.tokenDiscoveryService.discoverTokens(address);
+      if (discoveryResult.isFailure) {
+        return Result.fail(discoveryResult.getError());
       }
 
-      const assets = tokensResult.getValue();
+      const discovery = discoveryResult.getValue();
 
-      // Add assets to portfolio
-      for (const asset of assets) {
-        const addResult = portfolio.addAsset(asset);
-        if (addResult.isFailure) {
-          console.warn(`Failed to add asset ${asset.id}: ${addResult.error.message}`);
+      // Add token assets to portfolio
+      for (const token of discovery.tokens) {
+        // Find the corresponding token account data
+        const accountData = discovery.tokenAccounts.find(
+          ta => ta.mint.toBase58() === token.getMintAddress()
+        );
+        if (accountData) {
+          const amount = TokenAmount.fromTokenUnits(accountData.amount, accountData.decimals);
+          portfolio.addAssetHolding(token, amount, accountData.pubkey);
         }
       }
 
-      // Fetch NFTs
-      const nfts = await this.fetchNFTs(address);
+      // Add NFT assets to portfolio
+      for (const nft of discovery.nfts) {
+        const accountData = discovery.tokenAccounts.find(
+          ta => ta.mint.toBase58() === nft.getMint().toBase58()
+        );
+        if (accountData) {
+          portfolio.addNFTHolding(nft, accountData.pubkey);
+        }
+      }
 
       // Build snapshot
       const snapshot: PortfolioSnapshot = {
         address,
-        totalValueUSD: portfolio.calculateTotalValue(),
-        solBalance: this.getSolBalance(portfolio),
-        tokenCount: portfolio.getAssetsByType('token').length,
-        nftCount: nfts.length,
+        totalValueUSD: 0, // TODO: Add USD valuation
+        solBalance: portfolio.getNativeBalance().getUIAmount(),
+        tokenCount: portfolio.getTotalAssetCount(),
+        nftCount: portfolio.getTotalNFTCount(),
         tokens: this.buildTokenBalances(portfolio),
-        nfts: nfts,
+        nfts: this.buildNFTInfo(portfolio),
         lastUpdated: new Date()
       };
 
@@ -198,12 +208,12 @@ export class SolanaIntegrationFacade {
       // Pass the string address to the service
       const balanceResult = await this.balanceService.fetchWalletBalance(address);
       if (balanceResult.isFailure) {
-        return Result.fail(balanceResult.error);
+        return Result.fail(balanceResult.getError());
       }
       
       // Extract SOL balance from the wallet balance result
       const walletBalance = balanceResult.getValue();
-      return Result.ok(walletBalance.nativeBalance);
+      return Result.ok(walletBalance.nativeBalance.getUIAmount());
     } catch (error) {
       return Result.fail(
         new ValidationError(`Invalid Solana public key: ${address}`, 'publicKey', address)
@@ -216,18 +226,23 @@ export class SolanaIntegrationFacade {
    */
   async getTokenBalances(address: string): Promise<Result<TokenBalance[], DomainError>> {
     try {
-      const publicKey = new PublicKey(address);
-      const tokenAccounts = await this.splTokenAdapter.getTokenAccounts(publicKey);
-      
+      const publicKeyVO = PublicKeyVO.create(address);
+      const accountsResult = await this.splTokenAdapter.getTokenAccountsByOwner(publicKeyVO);
+
+      if (accountsResult.isFailure) {
+        return Result.fail(accountsResult.getError());
+      }
+
+      const tokenAccounts = accountsResult.getValue();
       const balances: TokenBalance[] = [];
+
       for (const account of tokenAccounts) {
-        const metadata = await this.splTokenAdapter.getTokenMetadata(account.mint);
         balances.push({
-          mint: account.mint.toString(),
-          symbol: metadata?.symbol || 'UNKNOWN',
-          name: metadata?.name || 'Unknown Token',
-          balance: Number(account.amount) / Math.pow(10, account.decimals),
-          decimals: account.decimals
+          mint: account.mint.toBase58(),
+          symbol: 'UNKNOWN', // TODO: Fetch metadata
+          name: 'Unknown Token',
+          balance: account.amount.getUIAmount(),
+          decimals: account.amount.getDecimals()
         });
       }
 
@@ -256,14 +271,14 @@ export class SolanaIntegrationFacade {
   /**
    * Subscribe to portfolio updates
    */
-  onPortfolioUpdate(callback: (event: DomainEvents.PortfolioSyncedEvent) => void): void {
+  onPortfolioUpdate(callback: (event: DomainEvent) => void): void {
     this.subscribe('PortfolioSynced', callback);
   }
 
   /**
    * Subscribe to balance updates
    */
-  onBalanceUpdate(callback: (event: DomainEvents.BalanceUpdatedEvent) => void): void {
+  onBalanceUpdate(callback: (event: DomainEvent) => void): void {
     this.subscribe('BalanceUpdated', callback);
   }
 
@@ -279,7 +294,8 @@ export class SolanaIntegrationFacade {
    * Update RPC endpoints
    */
   updateEndpoints(endpoints: string[]): void {
-    this.connectionManager.updateEndpoints(endpoints);
+    // TODO: Implement endpoint updating in ConnectionManager
+    console.warn('updateEndpoints not yet implemented');
   }
 
   /**
@@ -325,20 +341,31 @@ export class SolanaIntegrationFacade {
   }
 
   private getSolBalance(portfolio: PortfolioAggregate): number {
-    const solAsset = portfolio.getAssets().find(
-      asset => asset.assetType === 'native' && asset.symbol === 'SOL'
-    );
-    return solAsset ? solAsset.balance.getValue() : 0;
+    return portfolio.getNativeBalance().getUIAmount();
   }
 
   private buildTokenBalances(portfolio: PortfolioAggregate): TokenBalance[] {
-    return portfolio.getAssetsByType('token').map(asset => ({
-      mint: asset.mint,
-      symbol: asset.symbol,
-      name: asset.name,
-      balance: asset.balance.getValue(),
-      decimals: asset.decimals,
-      valueUSD: asset.valueUSD
+    return portfolio.getAssetHoldings().map(holding => ({
+      mint: holding.asset.getMintAddress(),
+      symbol: holding.asset.getSymbol(),
+      name: holding.asset.getName(),
+      balance: holding.balance.getUIAmount(),
+      decimals: holding.asset.getDecimals(),
+      valueUSD: undefined // TODO: Add USD valuation
+    }));
+  }
+
+  private buildNFTInfo(portfolio: PortfolioAggregate): NFTInfo[] {
+    return portfolio.getNFTHoldings().map(holding => ({
+      mint: holding.nft.getMint().toBase58(),
+      name: holding.nft.getName(),
+      symbol: holding.nft.getSymbol(),
+      uri: holding.nft.getExternalUrl() || holding.nft.getImage() || '',
+      collection: holding.nft.getCollection()?.toBase58(),
+      attributes: holding.nft.getAttributes().reduce((acc, attr) => {
+        acc[attr.trait_type] = attr.value;
+        return acc;
+      }, {} as Record<string, any>)
     }));
   }
 

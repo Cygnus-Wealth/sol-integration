@@ -50,8 +50,8 @@ export class InMemoryAssetRepository implements IAssetRepository {
     };
 
     this.assetCache = new LRUCache({
-      maxSize: this.config.maxAssets,
-      defaultTTL: this.config.assetCacheTTL,
+      maxSize: this.config.maxAssets!,
+      defaultTTL: this.config.assetCacheTTL!,
       onEvict: (key, asset) => {
         this.removeFromIndexes(key, asset);
         if (this.config.enableMetrics) {
@@ -260,9 +260,9 @@ export class InMemoryAssetRepository implements IAssetRepository {
 
       // Apply verified filter
       if (filter.verified !== undefined) {
-        const verifiedAssets = filter.verified ? this.verifiedIndex : new Set();
+        const verifiedAssets = filter.verified ? this.verifiedIndex : new Set<string>();
         if (isFirstFilter) {
-          candidateMints = new Set(verifiedAssets);
+          candidateMints = new Set<string>(verifiedAssets);
           isFirstFilter = false;
         } else {
           candidateMints = new Set([...candidateMints].filter(mint => 

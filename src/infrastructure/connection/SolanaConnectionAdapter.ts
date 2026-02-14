@@ -191,11 +191,12 @@ export class SolanaConnectionAdapter implements ISolanaConnection {
    */
   async checkHealth(): Promise<Result<boolean, DomainError>> {
     return this.executeWithResilience(async () => {
-      const result = await this.withTimeout(
-        this.connection.getHealth(),
+      // Use getSlot as a simple health check since getHealth() doesn't exist
+      const slot = await this.withTimeout(
+        this.connection.getSlot(),
         'checkHealth'
       );
-      return result === 'ok';
+      return slot > 0;
     }, 'checkHealth');
   }
 
@@ -252,20 +253,14 @@ export class SolanaConnectionAdapter implements ISolanaConnection {
     try {
       if (this.circuitBreaker && this.retryPolicy) {
         // Use both circuit breaker and retry policy
-        const result = await this.circuitBreaker.execute(() => 
-          this.retryPolicy!.execute(operation)
-        );
-        
-        if (result.isFailure) {
-          return result;
-        }
-        
-        const retryResult = result.getValue();
-        if (retryResult.isFailure) {
-          return retryResult;
-        }
-        
-        return Result.ok(retryResult.getValue());
+        // First apply retry policy, then circuit breaker
+        return await this.circuitBreaker.execute(async () => {
+          const retryResult = await this.retryPolicy!.execute(operation);
+          if (retryResult.isFailure) {
+            throw retryResult.getError();
+          }
+          return retryResult.getValue();
+        });
       } else if (this.circuitBreaker) {
         // Use only circuit breaker
         return await this.circuitBreaker.execute(operation);
