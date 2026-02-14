@@ -214,7 +214,7 @@ export class LRUCache<T> {
       
       for (const key of keys) {
         const result = this.get(key);
-        if (result.isSuccess() && result.getValue() !== null) {
+        if (result.isSuccess && result.getValue() !== null) {
           results.set(key, result.getValue()!);
         }
       }
@@ -234,7 +234,7 @@ export class LRUCache<T> {
     try {
       for (const [key, value] of entries) {
         const result = this.set(key, value, ttl);
-        if (result.isFailure()) {
+        if (result.isFailure) {
           return result;
         }
       }

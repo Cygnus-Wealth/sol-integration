@@ -382,3 +382,16 @@ export class DeserializationError extends DomainError {
     );
   }
 }
+
+/**
+ * Generic operation error for infrastructure and application layer failures
+ */
+export class OperationError extends DomainError {
+  constructor(
+    code: string,
+    message: string,
+    context?: Record<string, any>
+  ) {
+    super(code, message, context);
+  }
+}

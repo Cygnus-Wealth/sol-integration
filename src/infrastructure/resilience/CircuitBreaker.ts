@@ -6,7 +6,7 @@
  */
 
 import { Result } from '../../domain/shared/Result';
-import { DomainError, CircuitBreakerOpenError } from '../../domain/shared/DomainError';
+import { DomainError, CircuitBreakerOpenError, OperationError } from '../../domain/shared/DomainError';
 
 export enum CircuitState {
   CLOSED = 'CLOSED',     // Normal operation
@@ -67,7 +67,7 @@ export class CircuitBreaker {
   ): Promise<Result<T, DomainError>> {
     const canExecute = this.canExecute();
     
-    if (!canExecute.isSuccess()) {
+    if (!canExecute.isSuccess) {
       // Circuit is open, try fallback if available
       if (fallback) {
         try {
@@ -102,7 +102,7 @@ export class CircuitBreaker {
       this.onFailure(error as Error, executionTime);
       
       return Result.fail(
-        new DomainError(
+        new OperationError(
           'CIRCUIT_BREAKER_FAILURE',
           `Operation failed in circuit breaker '${this.name}': ${(error as Error).message}`,
           { 
@@ -141,7 +141,7 @@ export class CircuitBreaker {
         
       default:
         return Result.fail(
-          new DomainError('INVALID_CIRCUIT_STATE', `Invalid circuit state: ${this.state}`)
+          new OperationError('INVALID_CIRCUIT_STATE', `Invalid circuit state: ${this.state}`)
         );
     }
   }

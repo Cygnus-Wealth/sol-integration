@@ -159,7 +159,7 @@ export class InMemoryBalanceRepository implements IBalanceRepository {
     try {
       for (const snapshot of snapshots) {
         const result = await this.saveBalance(snapshot, ttl);
-        if (result.isFailure()) {
+        if (result.isFailure) {
           return result;
         }
       }

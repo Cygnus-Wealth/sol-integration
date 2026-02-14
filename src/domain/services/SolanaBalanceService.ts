@@ -77,7 +77,7 @@ export class SolanaBalanceService {
       // Check cache first unless force refresh
       if (!options.forceRefresh) {
         const cachedResult = await this.getCachedBalance(walletKey, maxCacheAge);
-        if (cachedResult.isSuccess() && cachedResult.getValue()) {
+        if (cachedResult.isSuccess && cachedResult.getValue()) {
           options.progressCallback?.(100, 'Loaded from cache');
           return Result.ok(cachedResult.getValue()!);
         }
@@ -87,7 +87,7 @@ export class SolanaBalanceService {
 
       // Fetch native SOL balance with retry
       const nativeBalanceResult = await this.fetchNativeBalanceWithRetry(walletKey);
-      if (nativeBalanceResult.isFailure()) {
+      if (nativeBalanceResult.isFailure) {
         return Result.fail(nativeBalanceResult.getError());
       }
 
@@ -95,7 +95,7 @@ export class SolanaBalanceService {
 
       // Fetch token accounts
       const tokenAccountsResult = await this.fetchTokenAccountsWithRetry(walletKey);
-      if (tokenAccountsResult.isFailure()) {
+      if (tokenAccountsResult.isFailure) {
         return Result.fail(tokenAccountsResult.getError());
       }
 
@@ -111,7 +111,7 @@ export class SolanaBalanceService {
 
         // Fetch asset metadata
         const assetResult = await this.assetRepository.findByMint(account.mint);
-        const asset = assetResult.isSuccess() ? assetResult.getValue() : undefined;
+        const asset = assetResult.isSuccess ? assetResult.getValue() : undefined;
 
         // Skip NFTs if not requested
         if (!options.includeNFTs && asset?.isNFT()) {
@@ -135,7 +135,7 @@ export class SolanaBalanceService {
 
       // Get current slot for consistency
       const slotResult = await this.connection.getSlot();
-      const slot = slotResult.isSuccess() ? slotResult.getValue() : 0;
+      const slot = slotResult.isSuccess ? slotResult.getValue() : 0;
 
       // Create wallet balance
       const walletBalance: WalletBalance = {
@@ -175,7 +175,7 @@ export class SolanaBalanceService {
     for (let attempt = 0; attempt < this.MAX_RETRIES; attempt++) {
       const result = await this.connection.getBalance(wallet);
       
-      if (result.isSuccess()) {
+      if (result.isSuccess) {
         return Result.ok(TokenAmount.fromLamports(result.getValue()));
       }
 
@@ -208,7 +208,7 @@ export class SolanaBalanceService {
     for (let attempt = 0; attempt < this.MAX_RETRIES; attempt++) {
       const result = await this.connection.getTokenAccounts(wallet);
       
-      if (result.isSuccess()) {
+      if (result.isSuccess) {
         return result;
       }
 
@@ -239,7 +239,7 @@ export class SolanaBalanceService {
   ): Promise<Result<WalletBalance | null, DomainError>> {
     const cachedBalancesResult = await this.balanceRepository.getWalletBalances(wallet);
     
-    if (cachedBalancesResult.isFailure()) {
+    if (cachedBalancesResult.isFailure) {
       return Result.ok(null); // Cache miss is not an error
     }
 
@@ -274,7 +274,7 @@ export class SolanaBalanceService {
       }
 
       const assetResult = await this.assetRepository.findByMint(entry.snapshot.mintAddress);
-      const asset = assetResult.isSuccess() ? assetResult.getValue() : undefined;
+      const asset = assetResult.isSuccess ? assetResult.getValue() : undefined;
 
       tokenBalances.push({
         mint: entry.snapshot.mintAddress,

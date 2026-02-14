@@ -25,7 +25,7 @@ import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { PublicKeyVO } from '../../domain/asset/valueObjects/PublicKeyVO';
 import { TokenAmount } from '../../domain/asset/valueObjects/TokenAmount';
 import { Result } from '../../domain/shared/Result';
-import { DomainError, TokenAccountError, ValidationError, NetworkError } from '../../domain/shared/DomainError';
+import { DomainError, TokenAccountError, ValidationError, NetworkError, OperationError } from '../../domain/shared/DomainError';
 
 export interface TokenAccountData {
   address: PublicKeyVO;
@@ -201,7 +201,7 @@ export class SPLTokenAdapter {
       }
 
       return Result.fail(
-        new DomainError(
+        new OperationError(
           'MINT_FETCH_ERROR',
           `Failed to get mint data: ${error instanceof Error ? error.message : String(error)}`,
           { mint: mint.toBase58() }
@@ -237,7 +237,7 @@ export class SPLTokenAdapter {
             programId
           );
 
-          if (tokenAccountResult.isSuccess()) {
+          if (tokenAccountResult.isSuccess) {
             tokenAccounts.push(tokenAccountResult.getValue());
           }
         } catch (error) {
@@ -278,7 +278,7 @@ export class SPLTokenAdapter {
           const accountsResult = await this.getTokenAccountsByOwner(owner, mint, programId);
           return {
             owner: owner.toBase58(),
-            accounts: accountsResult.isSuccess() ? accountsResult.getValue() : []
+            accounts: accountsResult.isSuccess ? accountsResult.getValue() : []
           };
         });
 
@@ -316,11 +316,11 @@ export class SPLTokenAdapter {
         this.getTokenAccountsByOwner(owner, undefined, PublicKeyVO.fromPublicKey(TOKEN_2022_PROGRAM_ID))
       ]);
 
-      const legacyTokens = legacyResult.status === 'fulfilled' && legacyResult.value.isSuccess()
+      const legacyTokens = legacyResult.status === 'fulfilled' && legacyResult.value.isSuccess
         ? legacyResult.value.getValue()
         : [];
 
-      const token2022 = token2022Result.status === 'fulfilled' && token2022Result.value.isSuccess()
+      const token2022 = token2022Result.status === 'fulfilled' && token2022Result.value.isSuccess
         ? token2022Result.value.getValue()
         : [];
 
@@ -353,7 +353,7 @@ export class SPLTokenAdapter {
   }, DomainError>> {
     try {
       const ataResult = await this.findAssociatedTokenAccount(owner, mint, false, programId);
-      if (ataResult.isFailure()) {
+      if (ataResult.isFailure) {
         return Result.fail(ataResult.getError());
       }
 
@@ -367,7 +367,7 @@ export class SPLTokenAdapter {
       }
 
       const accountResult = await this.getTokenAccount(ataInfo.address, programId);
-      if (accountResult.isFailure()) {
+      if (accountResult.isFailure) {
         return Result.fail(accountResult.getError());
       }
 
@@ -446,7 +446,7 @@ export class SPLTokenAdapter {
   ): Promise<Result<boolean, DomainError>> {
     try {
       const accountResult = await this.getTokenAccount(tokenAccount);
-      if (accountResult.isFailure()) {
+      if (accountResult.isFailure) {
         return Result.fail(accountResult.getError());
       }
 
@@ -487,7 +487,7 @@ export class SPLTokenAdapter {
   }, DomainError>> {
     try {
       const accountResult = await this.getTokenAccount(tokenAccount);
-      if (accountResult.isFailure()) {
+      if (accountResult.isFailure) {
         return Result.fail(accountResult.getError());
       }
 
@@ -522,7 +522,7 @@ export class SPLTokenAdapter {
   }, DomainError>> {
     try {
       const mintResult = await this.getMint(mint, programId);
-      if (mintResult.isFailure()) {
+      if (mintResult.isFailure) {
         return Result.ok({
           isValid: false,
           hasAuthority: false
@@ -562,7 +562,7 @@ export class SPLTokenAdapter {
 
     try {
       const mintResult = await this.getMint(mint);
-      if (mintResult.isSuccess()) {
+      if (mintResult.isSuccess) {
         const decimals = mintResult.getValue().decimals;
         this.mintDecimalsCache.set(mintAddress, decimals);
         return decimals;

@@ -19,7 +19,7 @@ import {
   ConnectionFeature
 } from '../../domain/repositories/IConnectionRepository';
 import { Result } from '../../domain/shared/Result';
-import { DomainError, ResourceNotFoundError, ConfigurationError, CircuitBreakerOpenError } from '../../domain/shared/DomainError';
+import { DomainError, ResourceNotFoundError, ConfigurationError, CircuitBreakerOpenError, OperationError } from '../../domain/shared/DomainError';
 import { LRUCache } from '../cache/LRUCache';
 import { CircuitBreaker, CircuitBreakerConfig } from '../resilience/CircuitBreaker';
 import { SolanaConnectionAdapter, ConnectionConfig } from '../connection/SolanaConnectionAdapter';
@@ -75,7 +75,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(endpoints);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get all endpoints', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get all endpoints', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -89,7 +89,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(activeEndpoints);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get active endpoints', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get active endpoints', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -100,7 +100,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(state ? state.endpoint : null);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get endpoint', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get endpoint', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -113,7 +113,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       
       if (this.endpoints.has(id)) {
         return Result.fail(
-          new DomainError('DUPLICATE_ENDPOINT', `Endpoint with URL ${endpoint.url} already exists`, { url: endpoint.url })
+          new OperationError('DUPLICATE_ENDPOINT', `Endpoint with URL ${endpoint.url} already exists`, { url: endpoint.url })
         );
       }
 
@@ -169,7 +169,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(fullEndpoint);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to add endpoint', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to add endpoint', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -190,7 +190,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(updatedEndpoint);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to update endpoint', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to update endpoint', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -212,7 +212,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to remove endpoint', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to remove endpoint', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -220,7 +220,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
   async getBestEndpoint(feature?: ConnectionFeature): Promise<Result<ConnectionEndpoint | null, DomainError>> {
     try {
       const activeEndpointsResult = await this.getActiveEndpoints();
-      if (activeEndpointsResult.isFailure()) {
+      if (activeEndpointsResult.isFailure) {
         return Result.fail(activeEndpointsResult.getError());
       }
 
@@ -239,7 +239,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(bestEndpoint);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get best endpoint', { feature, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get best endpoint', { feature, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -255,7 +255,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(endpoints);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get endpoints by network', { network, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get endpoints by network', { network, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -270,7 +270,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       // Check cache first
       const cacheKey = `health-${id}`;
       const cachedHealth = this.healthCache.get(cacheKey);
-      if (cachedHealth.isSuccess() && cachedHealth.getValue()) {
+      if (cachedHealth.isSuccess && cachedHealth.getValue()) {
         return Result.ok(cachedHealth.getValue()!);
       }
 
@@ -282,11 +282,11 @@ export class SolanaConnectionRepository implements IConnectionRepository {
 
       const health: ConnectionHealth = {
         endpoint: state.endpoint,
-        isHealthy: healthResult.isSuccess() && healthResult.getValue() === true,
+        isHealthy: healthResult.isSuccess && healthResult.getValue() === true,
         latency,
         successRate: this.calculateSuccessRate(state.stats),
         errorRate: this.calculateErrorRate(state.stats),
-        lastError: healthResult.isFailure() ? healthResult.getError() : undefined,
+        lastError: healthResult.isFailure ? healthResult.getError() : undefined,
         uptime: this.calculateUptime(state),
         checkedAt: new Date()
       };
@@ -308,7 +308,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(health);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to check endpoint health', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to check endpoint health', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -323,7 +323,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       const healthResults: ConnectionHealth[] = [];
 
       for (const result of results) {
-        if (result.status === 'fulfilled' && result.value.isSuccess()) {
+        if (result.status === 'fulfilled' && result.value.isSuccess) {
           healthResults.push(result.value.getValue());
         }
       }
@@ -331,7 +331,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(healthResults);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to check all endpoints health', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to check all endpoints health', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -362,7 +362,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to update endpoint health', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to update endpoint health', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -387,7 +387,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(history);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get health history', { endpointId: id, hours, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get health history', { endpointId: id, hours, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -423,7 +423,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to record request', { endpointId, success, latency, feature, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to record request', { endpointId, success, latency, feature, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -441,7 +441,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(state.stats);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get endpoint stats', { endpointId: id, hours, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get endpoint stats', { endpointId: id, hours, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -476,7 +476,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(aggregated);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get aggregated stats', { hours, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get aggregated stats', { hours, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -494,7 +494,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to set pool config', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to set pool config', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -504,7 +504,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok({ ...this.poolConfig });
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get pool config', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get pool config', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -523,7 +523,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (err) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to mark endpoint as failed', { endpointId: id, error: err instanceof Error ? err.message : String(err) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to mark endpoint as failed', { endpointId: id, error: err instanceof Error ? err.message : String(err) })
       );
     }
   }
@@ -542,7 +542,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to restore endpoint', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to restore endpoint', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -556,7 +556,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(failedEndpoints);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to get failed endpoints', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to get failed endpoints', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -571,7 +571,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(state.circuitBreaker.isOpen());
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to check circuit state', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to check circuit state', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -587,7 +587,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to reset circuit breaker', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to reset circuit breaker', { endpointId: id, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -621,7 +621,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(currentCount < rateLimit.requestsPerSecond);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to check rate limit', { endpointId, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to check rate limit', { endpointId, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -644,7 +644,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to record rate limit usage', { endpointId, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to record rate limit usage', { endpointId, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -666,7 +666,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to clear rate limit counters', { endpointId, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to clear rate limit counters', { endpointId, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -685,7 +685,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(prunedCount);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to prune old health data', { olderThanHours, error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to prune old health data', { olderThanHours, error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -702,7 +702,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to clear statistics', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to clear statistics', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -720,7 +720,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(config);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to export config', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to export config', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }
@@ -737,7 +737,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       // Import endpoints
       for (const endpointConfig of config.endpoints) {
         const result = await this.addEndpoint(endpointConfig.endpoint);
-        if (result.isFailure()) {
+        if (result.isFailure) {
           return Result.fail(result.getError());
         }
       }
@@ -745,7 +745,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       // Import pool config
       if (config.poolConfig) {
         const poolResult = await this.setPoolConfig(config.poolConfig);
-        if (poolResult.isFailure()) {
+        if (poolResult.isFailure) {
           return Result.fail(poolResult.getError());
         }
       }
@@ -753,7 +753,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('REPOSITORY_ERROR', 'Failed to import config', { error: error instanceof Error ? error.message : String(error) })
+        new OperationError('REPOSITORY_ERROR', 'Failed to import config', { error: error instanceof Error ? error.message : String(error) })
       );
     }
   }

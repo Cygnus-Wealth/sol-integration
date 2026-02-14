@@ -127,7 +127,7 @@ export class MetaplexAdapter {
       
       // Check cache first
       const cachedResult = this.metadataCache.get(mintAddress);
-      if (cachedResult.isSuccess() && cachedResult.getValue()) {
+      if (cachedResult.isSuccess && cachedResult.getValue()) {
         return Result.ok(cachedResult.getValue()!);
       }
 
@@ -215,7 +215,7 @@ export class MetaplexAdapter {
       for (const mint of mints) {
         const mintAddress = mint.toBase58();
         const cachedResult = this.metadataCache.get(mintAddress);
-        if (cachedResult.isSuccess() && cachedResult.getValue()) {
+        if (cachedResult.isSuccess && cachedResult.getValue()) {
           results.set(mintAddress, cachedResult.getValue()!);
         } else {
           uncachedMints.push(mint);
@@ -234,7 +234,7 @@ export class MetaplexAdapter {
           const result = batchResults[j];
           const mint = batch[j];
           
-          if (result.status === 'fulfilled' && result.value.isSuccess()) {
+          if (result.status === 'fulfilled' && result.value.isSuccess) {
             const metadata = result.value.getValue();
             if (metadata) {
               results.set(mint.toBase58(), metadata);
@@ -297,7 +297,7 @@ export class MetaplexAdapter {
           const mintVO = PublicKeyVO.fromPublicKey(nft.address);
           const metadataResult = await this.getNFTMetadata(mintVO);
           
-          if (metadataResult.isSuccess() && metadataResult.getValue()) {
+          if (metadataResult.isSuccess && metadataResult.getValue()) {
             metadataResults.push(metadataResult.getValue()!);
           }
         } catch (error) {
@@ -327,7 +327,7 @@ export class MetaplexAdapter {
       
       // Check cache first
       const cachedResult = this.collectionCache.get(collectionAddress);
-      if (cachedResult.isSuccess() && cachedResult.getValue()) {
+      if (cachedResult.isSuccess && cachedResult.getValue()) {
         return Result.ok(cachedResult.getValue()!);
       }
 
@@ -470,7 +470,7 @@ export class MetaplexAdapter {
           { collection }
         );
         
-        if (nftsByCollectionResult.isSuccess()) {
+        if (nftsByCollectionResult.isSuccess) {
           searchBase = nftsByCollectionResult.getValue();
         }
       }

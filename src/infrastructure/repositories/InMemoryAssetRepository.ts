@@ -131,7 +131,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       const mintAddress = mint.toBase58();
       
       const cacheResult = this.assetCache.get(mintAddress);
-      if (cacheResult.isFailure()) {
+      if (cacheResult.isFailure) {
         return Result.fail(cacheResult.getError());
       }
 
@@ -159,7 +159,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       const mintAddresses = mints.map(mint => mint.toBase58());
       
       const cacheResult = this.assetCache.getMany(mintAddresses);
-      if (cacheResult.isFailure()) {
+      if (cacheResult.isFailure) {
         return Result.fail(cacheResult.getError());
       }
 
@@ -196,7 +196,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       
       for (const mint of mintAddresses) {
         const cacheResult = this.assetCache.get(mint);
-        if (cacheResult.isSuccess() && cacheResult.getValue()) {
+        if (cacheResult.isSuccess && cacheResult.getValue()) {
           assets.push(cacheResult.getValue()!);
           if (this.config.enableMetrics) {
             this.metrics.cacheHits++;
@@ -224,7 +224,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       
       for (const mintAddress of this.verifiedIndex) {
         const cacheResult = this.assetCache.get(mintAddress);
-        if (cacheResult.isSuccess() && cacheResult.getValue()) {
+        if (cacheResult.isSuccess && cacheResult.getValue()) {
           verified.push(cacheResult.getValue()!);
           if (this.config.enableMetrics) {
             this.metrics.cacheHits++;
@@ -302,7 +302,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       const results: SolanaAsset[] = [];
       for (const mint of candidateMints) {
         const cacheResult = this.assetCache.get(mint);
-        if (cacheResult.isSuccess() && cacheResult.getValue()) {
+        if (cacheResult.isSuccess && cacheResult.getValue()) {
           results.push(cacheResult.getValue()!);
           if (this.config.enableMetrics) {
             this.metrics.cacheHits++;
@@ -326,7 +326,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       
       // Save to cache
       const cacheResult = this.assetCache.set(mint, asset);
-      if (cacheResult.isFailure()) {
+      if (cacheResult.isFailure) {
         return Result.fail(cacheResult.getError());
       }
 
@@ -355,7 +355,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       }
 
       const cacheResult = this.assetCache.setMany(assetMap);
-      if (cacheResult.isFailure()) {
+      if (cacheResult.isFailure) {
         return Result.fail(cacheResult.getError());
       }
 
@@ -393,7 +393,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       }
 
       const searchResult = await this.search(filter);
-      if (searchResult.isFailure()) {
+      if (searchResult.isFailure) {
         return Result.fail(searchResult.getError());
       }
 
@@ -558,7 +558,7 @@ export class InMemoryAssetRepository implements IAssetRepository {
       const results: SolanaAsset[] = [];
       for (const mint of candidateMints) {
         const cacheResult = this.assetCache.get(mint);
-        if (cacheResult.isSuccess() && cacheResult.getValue()) {
+        if (cacheResult.isSuccess && cacheResult.getValue()) {
           results.push(cacheResult.getValue()!);
           if (this.config.enableMetrics) {
             this.metrics.cacheHits++;

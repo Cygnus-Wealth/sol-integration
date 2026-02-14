@@ -13,7 +13,7 @@ import {
   ConnectionFeature
 } from '../../domain/repositories/IConnectionRepository';
 import { Result } from '../../domain/shared/Result';
-import { DomainError, NetworkError, CircuitBreakerOpenError, ConnectionPoolExhaustedError } from '../../domain/shared/DomainError';
+import { DomainError, NetworkError, CircuitBreakerOpenError, ConnectionPoolExhaustedError, OperationError } from '../../domain/shared/DomainError';
 import { SolanaConnectionAdapter, ConnectionConfig } from '../connection/SolanaConnectionAdapter';
 
 interface ConnectionManagerConfig {
@@ -96,7 +96,7 @@ export class ConnectionManager implements IConnectionManager {
     for (let attempt = 0; attempt < retries; attempt++) {
       // Get best available connection
       const endpointResult = await this.getConnection(feature);
-      if (endpointResult.isFailure()) {
+      if (endpointResult.isFailure) {
         lastError = endpointResult.getError();
         continue;
       }
@@ -125,7 +125,7 @@ export class ConnectionManager implements IConnectionManager {
         
         await this.recordSuccess(endpoint.id, responseTime);
         
-        if (result.isSuccess()) {
+        if (result.isSuccess) {
           return result;
         } else {
           lastError = result.getError();
@@ -162,7 +162,7 @@ export class ConnectionManager implements IConnectionManager {
   async getConnection(feature?: ConnectionFeature): Promise<Result<ConnectionEndpoint, DomainError>> {
     try {
       const endpointResult = await this.connectionRepo.getBestEndpoint(feature);
-      if (endpointResult.isFailure()) {
+      if (endpointResult.isFailure) {
         return Result.fail(endpointResult.getError());
       }
 
@@ -202,7 +202,7 @@ export class ConnectionManager implements IConnectionManager {
 
       // Initialize connection states for all endpoints
       const endpointsResult = await this.connectionRepo.getAllEndpoints();
-      if (endpointsResult.isSuccess()) {
+      if (endpointsResult.isSuccess) {
         for (const endpoint of endpointsResult.getValue()) {
           await this.ensureConnectionState(endpoint);
         }
@@ -225,7 +225,7 @@ export class ConnectionManager implements IConnectionManager {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('MONITORING_ERROR', `Failed to start health monitoring: ${error instanceof Error ? error.message : String(error)}`)
+        new OperationError('MONITORING_ERROR', `Failed to start health monitoring: ${error instanceof Error ? error.message : String(error)}`)
       );
     }
   }
@@ -248,7 +248,7 @@ export class ConnectionManager implements IConnectionManager {
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(
-        new DomainError('MONITORING_ERROR', `Failed to stop health monitoring: ${error instanceof Error ? error.message : String(error)}`)
+        new OperationError('MONITORING_ERROR', `Failed to stop health monitoring: ${error instanceof Error ? error.message : String(error)}`)
       );
     }
   }
@@ -256,7 +256,7 @@ export class ConnectionManager implements IConnectionManager {
   async forceHealthCheck(): Promise<Result<ConnectionHealth[], DomainError>> {
     try {
       const healthResults = await this.connectionRepo.checkAllEndpointsHealth();
-      if (healthResults.isFailure()) {
+      if (healthResults.isFailure) {
         return Result.fail(healthResults.getError());
       }
 
@@ -287,7 +287,7 @@ export class ConnectionManager implements IConnectionManager {
       return Result.ok(allHealth);
     } catch (error) {
       return Result.fail(
-        new DomainError('HEALTH_CHECK_ERROR', `Failed to force health check: ${error instanceof Error ? error.message : String(error)}`)
+        new OperationError('HEALTH_CHECK_ERROR', `Failed to force health check: ${error instanceof Error ? error.message : String(error)}`)
       );
     }
   }
@@ -302,7 +302,7 @@ export class ConnectionManager implements IConnectionManager {
   }, DomainError>> {
     try {
       const endpointsResult = await this.connectionRepo.getAllEndpoints();
-      if (endpointsResult.isFailure()) {
+      if (endpointsResult.isFailure) {
         return Result.fail(endpointsResult.getError());
       }
 
@@ -316,7 +316,7 @@ export class ConnectionManager implements IConnectionManager {
 
       for (const endpoint of allEndpoints) {
         const healthResult = await this.connectionRepo.getHealthHistory(endpoint.id, 1);
-        if (healthResult.isSuccess()) {
+        if (healthResult.isSuccess) {
           const history = healthResult.getValue();
           if (history.length > 0) {
             totalLatency += history[0].latency;
@@ -340,7 +340,7 @@ export class ConnectionManager implements IConnectionManager {
       });
     } catch (error) {
       return Result.fail(
-        new DomainError('STATUS_ERROR', `Failed to get connection status: ${error instanceof Error ? error.message : String(error)}`)
+        new OperationError('STATUS_ERROR', `Failed to get connection status: ${error instanceof Error ? error.message : String(error)}`)
       );
     }
   }
@@ -446,7 +446,7 @@ export class ConnectionManager implements IConnectionManager {
   private async attemptRecovery(): Promise<void> {
     try {
       const failedEndpointsResult = await this.connectionRepo.getFailedEndpoints();
-      if (failedEndpointsResult.isFailure()) {
+      if (failedEndpointsResult.isFailure) {
         return;
       }
 
@@ -455,7 +455,7 @@ export class ConnectionManager implements IConnectionManager {
       for (const endpoint of failedEndpoints) {
         // Try to test the connection
         const healthResult = await this.testConnection(endpoint.id);
-        if (healthResult.isSuccess() && healthResult.getValue().isHealthy) {
+        if (healthResult.isSuccess && healthResult.getValue().isHealthy) {
           // Restore the endpoint
           await this.connectionRepo.restoreEndpoint(endpoint.id);
           
@@ -545,7 +545,7 @@ export class ConnectionManager implements IConnectionManager {
     endpoint: Omit<ConnectionEndpoint, 'id' | 'healthScore' | 'lastHealthCheck'>
   ): Promise<Result<ConnectionEndpoint, DomainError>> {
     const result = await this.connectionRepo.addEndpoint(endpoint);
-    if (result.isSuccess()) {
+    if (result.isSuccess) {
       await this.ensureConnectionState(result.getValue());
       this.updateStats();
     }
@@ -557,7 +557,7 @@ export class ConnectionManager implements IConnectionManager {
    */
   async removeEndpoint(endpointId: string): Promise<Result<void, DomainError>> {
     const result = await this.connectionRepo.removeEndpoint(endpointId);
-    if (result.isSuccess()) {
+    if (result.isSuccess) {
       this.connectionStates.delete(endpointId);
       this.updateStats();
     }

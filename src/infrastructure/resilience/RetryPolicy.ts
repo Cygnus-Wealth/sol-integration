@@ -6,7 +6,7 @@
  */
 
 import { Result } from '../../domain/shared/Result';
-import { DomainError, NetworkError, TimeoutError, RPCError } from '../../domain/shared/DomainError';
+import { DomainError, NetworkError, TimeoutError, RPCError, OperationError } from '../../domain/shared/DomainError';
 
 export interface RetryConfig {
   maxAttempts: number;
@@ -141,7 +141,7 @@ export class RetryPolicy {
     this.updateMetrics(false, totalTime);
     
     return Result.fail(
-      new DomainError(
+      new OperationError(
         'RETRY_EXHAUSTED',
         `All ${this.config.maxAttempts} retry attempts failed for '${this.name}'`,
         { 
@@ -264,7 +264,7 @@ export class RetryPolicy {
       return error;
     }
     
-    return new DomainError(
+    return new OperationError(
       'OPERATION_FAILED',
       `Operation '${this.name}' failed after ${attempts} attempts: ${error.message}`,
       { 

@@ -12,12 +12,13 @@ import { SolanaAsset } from '../asset/aggregates/SolanaAsset';
 import { NFTAsset, NFTMetaplexMetadata } from '../asset/entities/NFTAsset';
 import { IAssetRepository } from '../repositories/IAssetRepository';
 import { Result } from '../shared/Result';
-import { 
-  DomainError, 
-  NetworkError, 
-  MetadataFetchError, 
+import {
+  DomainError,
+  NetworkError,
+  MetadataFetchError,
   NFTParseError,
-  AssetNotFoundError 
+  AssetNotFoundError,
+  OperationError
 } from '../shared/DomainError';
 
 export interface TokenAccountData {
@@ -94,7 +95,7 @@ export class TokenDiscoveryService {
 
       // Get all token accounts for the wallet
       const tokenAccountsResult = await this.connection.getTokenAccountsByOwner(wallet);
-      if (tokenAccountsResult.isFailure()) {
+      if (tokenAccountsResult.isFailure) {
         return Result.fail(tokenAccountsResult.getError());
       }
 
@@ -147,7 +148,7 @@ export class TokenDiscoveryService {
 
     } catch (error) {
       return Result.fail(
-        new DomainError(
+        new OperationError(
           'TOKEN_DISCOVERY_ERROR',
           error instanceof Error ? error.message : 'Unknown discovery error',
           { walletAddress }
@@ -165,13 +166,13 @@ export class TokenDiscoveryService {
       
       // Check if already in repository
       const existingResult = await this.assetRepository.findByMint(mint);
-      if (existingResult.isSuccess() && existingResult.getValue()) {
+      if (existingResult.isSuccess && existingResult.getValue()) {
         return Result.ok(existingResult.getValue()!);
       }
 
       // Fetch metadata
       const metadataResult = await this.connection.getTokenMetadata(mint);
-      if (metadataResult.isFailure()) {
+      if (metadataResult.isFailure) {
         return Result.fail(metadataResult.getError());
       }
 
@@ -230,7 +231,7 @@ export class TokenDiscoveryService {
 
       // Batch fetch metadata
       const metadataResult = await this.connection.getMultipleTokenMetadata(mints);
-      if (metadataResult.isFailure()) {
+      if (metadataResult.isFailure) {
         return Result.fail(metadataResult.getError());
       }
 
@@ -245,7 +246,7 @@ export class TokenDiscoveryService {
           const mint = PublicKeyVO.create(mintAddress);
           const existingResult = await this.assetRepository.findByMint(mint);
           
-          if (existingResult.isSuccess() && existingResult.getValue()) {
+          if (existingResult.isSuccess && existingResult.getValue()) {
             const asset = existingResult.getValue()!;
             
             // Update metadata
@@ -289,7 +290,7 @@ export class TokenDiscoveryService {
 
     } catch (error) {
       return Result.fail(
-        new DomainError(
+        new OperationError(
           'METADATA_REFRESH_ERROR',
           error instanceof Error ? error.message : 'Unknown refresh error',
           { mintAddresses }
@@ -320,7 +321,7 @@ export class TokenDiscoveryService {
 
     // Batch fetch metadata for all mints
     const metadataResult = await this.connection.getMultipleTokenMetadata(uniqueMints);
-    const metadataMap = metadataResult.isSuccess() 
+    const metadataMap = metadataResult.isSuccess 
       ? metadataResult.getValue() 
       : new Map<string, SPLTokenMetadata>();
 
@@ -334,7 +335,7 @@ export class TokenDiscoveryService {
           // Try to fetch NFT metadata
           if (options.includeNFTs) {
             const nftResult = await this.processNFTAccount(account);
-            if (nftResult.isSuccess()) {
+            if (nftResult.isSuccess) {
               nfts.push(nftResult.getValue());
               continue;
             }
@@ -373,7 +374,7 @@ export class TokenDiscoveryService {
 
       } catch (error) {
         errors.push(
-          new DomainError(
+          new OperationError(
             'TOKEN_PROCESSING_ERROR',
             error instanceof Error ? error.message : 'Unknown processing error',
             { mint: account.mint.toBase58() }
@@ -391,7 +392,7 @@ export class TokenDiscoveryService {
   private async processNFTAccount(account: TokenAccountData): Promise<Result<NFTAsset, DomainError>> {
     try {
       const nftMetadataResult = await this.connection.getNFTMetadata(account.mint);
-      if (nftMetadataResult.isFailure()) {
+      if (nftMetadataResult.isFailure) {
         return Result.fail(nftMetadataResult.getError());
       }
 
@@ -452,7 +453,7 @@ export class TokenDiscoveryService {
       
       for (const asset of assets) {
         const existingResult = await this.assetRepository.findByMint(asset.getMint());
-        if (existingResult.isFailure() || !existingResult.getValue()) {
+        if (existingResult.isFailure || !existingResult.getValue()) {
           newAssets.push(asset);
         }
       }
@@ -491,7 +492,7 @@ export class TokenDiscoveryService {
       const wallet = PublicKeyVO.create(walletAddress);
       
       const tokenAccountsResult = await this.connection.getTokenAccountsByOwner(wallet);
-      if (tokenAccountsResult.isFailure()) {
+      if (tokenAccountsResult.isFailure) {
         return Result.fail(tokenAccountsResult.getError());
       }
 
@@ -500,7 +501,7 @@ export class TokenDiscoveryService {
       
       // Get verified count from repository
       const verifiedResult = await this.assetRepository.getVerifiedAssets();
-      const verifiedCount = verifiedResult.isSuccess() 
+      const verifiedCount = verifiedResult.isSuccess 
         ? verifiedResult.getValue().filter(asset => 
             uniqueMints.has(asset.getMintAddress())
           ).length
@@ -516,7 +517,7 @@ export class TokenDiscoveryService {
 
     } catch (error) {
       return Result.fail(
-        new DomainError(
+        new OperationError(
           'DISCOVERY_STATS_ERROR',
           error instanceof Error ? error.message : 'Unknown stats error',
           { walletAddress }

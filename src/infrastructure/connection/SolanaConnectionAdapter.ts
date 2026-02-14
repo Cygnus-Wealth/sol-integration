@@ -10,7 +10,7 @@ import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { PublicKeyVO } from '../../domain/asset/valueObjects/PublicKeyVO';
 import { ISolanaConnection, TokenAccountInfo } from '../../domain/services/SolanaBalanceService';
 import { Result } from '../../domain/shared/Result';
-import { DomainError, NetworkError, TimeoutError, RPCError } from '../../domain/shared/DomainError';
+import { DomainError, NetworkError, TimeoutError, RPCError, OperationError } from '../../domain/shared/DomainError';
 import { CircuitBreaker, CircuitBreakerConfig } from '../resilience/CircuitBreaker';
 import { RetryPolicy, RetryStrategy } from '../resilience/RetryPolicy';
 
@@ -256,12 +256,12 @@ export class SolanaConnectionAdapter implements ISolanaConnection {
           this.retryPolicy!.execute(operation)
         );
         
-        if (result.isFailure()) {
+        if (result.isFailure) {
           return result;
         }
         
         const retryResult = result.getValue();
-        if (retryResult.isFailure()) {
+        if (retryResult.isFailure) {
           return retryResult;
         }
         
@@ -340,7 +340,7 @@ export class SolanaConnectionAdapter implements ISolanaConnection {
     }
 
     // Generic domain error
-    return new DomainError(
+    return new OperationError(
       'CONNECTION_ERROR',
       `Connection error in ${operation}: ${message}`,
       { endpoint, operation }
