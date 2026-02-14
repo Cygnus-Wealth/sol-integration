@@ -26,4 +26,4 @@ jobs:
 
       - run: npm install -g npm@latest
 
-      - run: npm publish --provenance --access public
+      - run: npm publish --access public
