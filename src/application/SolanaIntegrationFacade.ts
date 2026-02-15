@@ -62,6 +62,7 @@ export class SolanaIntegrationFacade {
   private assetRepository: InMemoryAssetRepository;
   private balanceRepository: InMemoryBalanceRepository;
   private connectionRepository: SolanaConnectionRepository;
+  private connectionAdapter: SolanaConnectionAdapter;
   private splTokenAdapter: SPLTokenAdapter;
   private metaplexAdapter: MetaplexAdapter;
   private balanceService: SolanaBalanceService;
@@ -70,6 +71,7 @@ export class SolanaIntegrationFacade {
   private config: SolanaConfig;
   private environment: NetworkEnvironment;
   private resolvedEndpoints: string[];
+  private metrics = { requests: 0, failures: 0, totalResponseTime: 0 };
 
   constructor(config: SolanaConfig) {
     this.config = config;
@@ -115,7 +117,7 @@ export class SolanaIntegrationFacade {
     this.metaplexAdapter = new MetaplexAdapter(connection);
 
     // Initialize domain services
-    const connectionAdapter = new SolanaConnectionAdapter({
+    this.connectionAdapter = new SolanaConnectionAdapter({
       endpoint: this.resolvedEndpoints[0],
       commitment: config.commitment || 'confirmed',
       network: networkConfig.clusterName,
@@ -124,12 +126,12 @@ export class SolanaIntegrationFacade {
       maxRetries: config.maxRetries || 3
     });
     this.balanceService = new SolanaBalanceService(
-      connectionAdapter,
+      this.connectionAdapter,
       this.assetRepository,
       this.balanceRepository
     );
     this.tokenDiscoveryService = new TokenDiscoveryService(
-      connectionAdapter as any, // TODO: Fix interface - SolanaConnectionAdapter should implement ITokenDiscoveryConnection
+      this.connectionAdapter,
       this.assetRepository
     );
 
@@ -141,11 +143,18 @@ export class SolanaIntegrationFacade {
    * Get complete portfolio snapshot for a wallet address
    */
   async getPortfolio(address: string): Promise<Result<PortfolioSnapshot, DomainError>> {
+    const start = Date.now();
     try {
       const publicKey = PublicKeyVO.create(address);
-      
-      // Create portfolio aggregate
-      const portfolio = PortfolioAggregate.create(publicKey.toString());
+
+      // Fetch SOL balance for the portfolio
+      const balanceResult = await this.balanceService.fetchWalletBalance(address);
+      const nativeBalance = balanceResult.isSuccess
+        ? balanceResult.getValue().nativeBalance
+        : TokenAmount.zero(9);
+
+      // Create portfolio aggregate with SOL balance
+      const portfolio = PortfolioAggregate.create(publicKey.toString(), nativeBalance);
 
       // Discover all tokens - service expects a string
       const discoveryResult = await this.tokenDiscoveryService.discoverTokens(address);
@@ -189,8 +198,10 @@ export class SolanaIntegrationFacade {
         lastUpdated: new Date()
       };
 
+      this.recordSuccess(start);
       return Result.ok(snapshot);
     } catch (error) {
+      this.recordFailure(start);
       return Result.fail(
         new PortfolioError(`Failed to fetch portfolio: ${error}`)
       );
@@ -201,20 +212,36 @@ export class SolanaIntegrationFacade {
    * Get SOL balance for a wallet
    */
   async getSolanaBalance(address: string): Promise<Result<number, DomainError>> {
+    const start = Date.now();
     try {
       // Validate the address first
       const publicKey = PublicKeyVO.create(address);
-      
-      // Pass the string address to the service
+
+      // Try primary endpoint
       const balanceResult = await this.balanceService.fetchWalletBalance(address);
-      if (balanceResult.isFailure) {
-        return Result.fail(balanceResult.getError());
+      if (balanceResult.isSuccess) {
+        this.recordSuccess(start);
+        const walletBalance = balanceResult.getValue();
+        return Result.ok(walletBalance.nativeBalance.getUIAmount());
       }
-      
-      // Extract SOL balance from the wallet balance result
-      const walletBalance = balanceResult.getValue();
-      return Result.ok(walletBalance.nativeBalance.getUIAmount());
+
+      // Failover: try alternative endpoints on non-validation errors
+      const primaryError = balanceResult.getError();
+      if (!(primaryError instanceof ValidationError) && this.resolvedEndpoints.length > 1) {
+        for (let i = 1; i < this.resolvedEndpoints.length; i++) {
+          this.switchEndpoint(i);
+          const retryResult = await this.balanceService.fetchWalletBalance(address);
+          if (retryResult.isSuccess) {
+            this.recordSuccess(start);
+            return Result.ok(retryResult.getValue().nativeBalance.getUIAmount());
+          }
+        }
+      }
+
+      this.recordFailure(start);
+      return Result.fail(primaryError);
     } catch (error) {
+      this.recordFailure(start);
       return Result.fail(
         new ValidationError(`Invalid Solana public key: ${address}`, 'publicKey', address)
       );
@@ -225,11 +252,13 @@ export class SolanaIntegrationFacade {
    * Get all SPL token balances for a wallet
    */
   async getTokenBalances(address: string): Promise<Result<TokenBalance[], DomainError>> {
+    const start = Date.now();
     try {
       const publicKeyVO = PublicKeyVO.create(address);
       const accountsResult = await this.splTokenAdapter.getTokenAccountsByOwner(publicKeyVO);
 
       if (accountsResult.isFailure) {
+        this.recordFailure(start);
         return Result.fail(accountsResult.getError());
       }
 
@@ -246,8 +275,10 @@ export class SolanaIntegrationFacade {
         });
       }
 
+      this.recordSuccess(start);
       return Result.ok(balances);
     } catch (error) {
+      this.recordFailure(start);
       return Result.fail(
         new NetworkError(`Failed to fetch tokens: ${error}`)
       );
@@ -258,10 +289,13 @@ export class SolanaIntegrationFacade {
    * Get NFTs for a wallet
    */
   async getNFTs(address: string): Promise<Result<NFTInfo[], DomainError>> {
+    const start = Date.now();
     try {
       const nfts = await this.fetchNFTs(address);
+      this.recordSuccess(start);
       return Result.ok(nfts);
     } catch (error) {
+      this.recordFailure(start);
       return Result.fail(
         new NetworkError(`Failed to fetch NFTs: ${error}`)
       );
@@ -302,12 +336,13 @@ export class SolanaIntegrationFacade {
    * Get connection health metrics
    */
   getHealthMetrics() {
-    // TODO: Implement proper metrics from ConnectionManager
     return {
       endpoints: this.resolvedEndpoints.length,
-      requests: 0,
-      failures: 0,
-      avgResponseTime: 0
+      requests: this.metrics.requests,
+      failures: this.metrics.failures,
+      avgResponseTime: this.metrics.requests > 0
+        ? this.metrics.totalResponseTime / this.metrics.requests
+        : 0
     };
   }
 
@@ -367,6 +402,26 @@ export class SolanaIntegrationFacade {
         return acc;
       }, {} as Record<string, any>)
     }));
+  }
+
+  private recordSuccess(start: number): void {
+    this.metrics.requests++;
+    this.metrics.totalResponseTime += Date.now() - start;
+  }
+
+  private recordFailure(start: number): void {
+    this.metrics.requests++;
+    this.metrics.failures++;
+    this.metrics.totalResponseTime += Date.now() - start;
+  }
+
+  private switchEndpoint(endpointIndex: number): void {
+    const endpoint = this.resolvedEndpoints[endpointIndex];
+    this.connectionAdapter.updateEndpoint(endpoint);
+    this.connectionAdapter.resetResilience();
+    const connection = new Connection(endpoint, this.config.commitment || 'confirmed');
+    this.splTokenAdapter = new SPLTokenAdapter(connection);
+    this.metaplexAdapter = new MetaplexAdapter(connection);
   }
 
   private subscribe(eventType: string, callback: (event: any) => void): void {

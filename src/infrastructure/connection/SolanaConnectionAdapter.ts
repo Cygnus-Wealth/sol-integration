@@ -9,6 +9,12 @@ import { Connection, PublicKey, ParsedAccountData, GetProgramAccountsFilter } fr
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { PublicKeyVO } from '../../domain/asset/valueObjects/PublicKeyVO';
 import { ISolanaConnection, TokenAccountInfo } from '../../domain/services/SolanaBalanceService';
+import {
+  ITokenDiscoveryConnection,
+  TokenAccountData as DiscoveryTokenAccountData,
+  SPLTokenMetadata
+} from '../../domain/services/TokenDiscoveryService';
+import { NFTMetaplexMetadata } from '../../domain/asset/entities/NFTAsset';
 import { Result } from '../../domain/shared/Result';
 import { DomainError, NetworkError, TimeoutError, RPCError, OperationError } from '../../domain/shared/DomainError';
 import { CircuitBreaker, CircuitBreakerConfig } from '../resilience/CircuitBreaker';
@@ -28,7 +34,7 @@ export interface ConnectionConfig {
   circuitBreakerConfig?: Partial<CircuitBreakerConfig>;
 }
 
-export class SolanaConnectionAdapter implements ISolanaConnection {
+export class SolanaConnectionAdapter implements ISolanaConnection, ITokenDiscoveryConnection {
   private connection: Connection;
   private readonly timeout: number;
   private readonly commitment: 'processed' | 'confirmed' | 'finalized';
@@ -131,6 +137,96 @@ export class SolanaConnectionAdapter implements ISolanaConnection {
     }, 'getTokenAccounts');
   }
 
+  async getTokenAccountsByOwner(owner: PublicKeyVO): Promise<Result<DiscoveryTokenAccountData[], DomainError>> {
+    return this.executeWithResilience(async () => {
+      const publicKey = owner.toPublicKey();
+      const tokenAccounts: DiscoveryTokenAccountData[] = [];
+
+      const programs = [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID];
+
+      for (const programId of programs) {
+        const accounts = await this.withTimeout(
+          this.connection.getParsedTokenAccountsByOwner(
+            publicKey,
+            { programId },
+            this.commitment
+          ),
+          'getTokenAccountsByOwner'
+        );
+
+        for (const account of accounts.value) {
+          const parsedData = account.account.data as ParsedAccountData;
+          const info = parsedData.parsed.info;
+
+          if (info.tokenAmount) {
+            tokenAccounts.push({
+              pubkey: PublicKeyVO.fromPublicKey(account.pubkey),
+              mint: PublicKeyVO.create(info.mint),
+              owner: owner,
+              amount: info.tokenAmount.amount,
+              decimals: info.tokenAmount.decimals,
+              uiAmount: info.tokenAmount.uiAmount,
+              state: info.state || 'initialized'
+            });
+          }
+        }
+      }
+
+      return tokenAccounts;
+    }, 'getTokenAccountsByOwner');
+  }
+
+  async getNFTMetadata(mint: PublicKeyVO): Promise<Result<NFTMetaplexMetadata | null, DomainError>> {
+    return this.executeWithResilience(async () => {
+      const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+      const [metadataPDA] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from('metadata'),
+          METADATA_PROGRAM_ID.toBuffer(),
+          mint.toPublicKey().toBuffer()
+        ],
+        METADATA_PROGRAM_ID
+      );
+
+      const accountInfo = await this.withTimeout(
+        this.connection.getAccountInfo(metadataPDA),
+        'getNFTMetadata'
+      );
+
+      if (!accountInfo) {
+        return null;
+      }
+
+      // Parse minimal NFT metadata from on-chain data
+      return {
+        name: 'Unknown NFT',
+        symbol: 'NFT',
+        description: undefined,
+        image: undefined,
+        external_url: undefined,
+        attributes: []
+      };
+    }, 'getNFTMetadata');
+  }
+
+  async getMultipleTokenMetadata(mints: PublicKeyVO[]): Promise<Result<Map<string, SPLTokenMetadata>, DomainError>> {
+    return this.executeWithResilience(async () => {
+      const metadataMap = new Map<string, SPLTokenMetadata>();
+
+      for (const mint of mints) {
+        const result = await this.getTokenMetadata(mint);
+        if (result.isSuccess) {
+          const metadata = result.getValue();
+          if (metadata) {
+            metadataMap.set(mint.toBase58(), metadata);
+          }
+        }
+      }
+
+      return metadataMap;
+    }, 'getMultipleTokenMetadata');
+  }
+
   async getSlot(): Promise<Result<number, DomainError>> {
     return this.executeWithResilience(async () => {
       const slot = await this.withTimeout(
@@ -156,7 +252,7 @@ export class SolanaConnectionAdapter implements ISolanaConnection {
   /**
    * Get token metadata (Metaplex standard)
    */
-  async getTokenMetadata(mint: PublicKeyVO): Promise<Result<any, DomainError>> {
+  async getTokenMetadata(mint: PublicKeyVO): Promise<Result<SPLTokenMetadata | null, DomainError>> {
     return this.executeWithResilience(async () => {
       // Metaplex metadata PDA derivation
       const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
@@ -178,10 +274,14 @@ export class SolanaConnectionAdapter implements ISolanaConnection {
         return null;
       }
 
-      // Parse metadata (simplified - actual implementation would decode properly)
+      // Parse minimal metadata from on-chain account
       return {
-        data: accountInfo.data,
-        owner: accountInfo.owner.toBase58()
+        mint,
+        name: 'Unknown Token',
+        symbol: 'UNKNOWN',
+        decimals: 0,
+        verified: false,
+        tags: []
       };
     }, 'getTokenMetadata');
   }

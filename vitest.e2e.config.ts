@@ -14,6 +14,11 @@ export default defineConfig({
       forks: {
         singleFork: true // Run tests sequentially to avoid rate limits
       }
+    },
+    server: {
+      deps: {
+        inline: ['@cygnus-wealth/data-models']
+      }
     }
   }
 });

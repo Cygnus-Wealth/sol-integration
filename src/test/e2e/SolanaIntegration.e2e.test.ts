@@ -86,14 +86,17 @@ describe('Solana Integration E2E Tests', () => {
       
       expect(result.isFailure).toBe(true);
       if (result.isFailure) {
-        expect(result.error.code).toContain('INVALID');
+        expect(result.error.code).toBe('VALIDATION_ERROR');
         expect(result.error.message).toContain('Invalid Solana public key');
       }
     });
 
     it('should use cache for repeated requests', async () => {
       const wallet = TEST_WALLETS.DEVNET_WALLET;
-      
+
+      // Ensure cache is empty so first call hits network
+      facade.clearCache();
+
       // First call - should hit network
       const start1 = Date.now();
       const result1 = await facade.getSolanaBalance(wallet);
