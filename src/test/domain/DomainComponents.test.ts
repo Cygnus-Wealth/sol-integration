@@ -489,8 +489,8 @@ describe('Result Pattern', () => {
     const value = 'test-value';
     const result = Result.ok(value);
     
-    expect(result.isSuccess()).toBe(true);
-    expect(result.isFailure()).toBe(false);
+    expect(result.isSuccess).toBe(true);
+    expect(result.isFailure).toBe(false);
     expect(result.getValue()).toBe(value);
   });
 
@@ -498,8 +498,8 @@ describe('Result Pattern', () => {
     const error = new ValidationError('Test error');
     const result = Result.fail(error);
     
-    expect(result.isSuccess()).toBe(false);
-    expect(result.isFailure()).toBe(true);
+    expect(result.isSuccess).toBe(false);
+    expect(result.isFailure).toBe(true);
     expect(result.getError()).toBe(error);
     expect(() => result.getValue()).toThrow();
   });

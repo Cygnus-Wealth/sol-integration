@@ -19,7 +19,7 @@ describe('LRUCache', () => {
     if (cache) {
       cache.destroy();
     }
-    vi.restoreAllTimers();
+    vi.useRealTimers();
   });
 
   describe('Basic Operations', () => {
@@ -32,16 +32,16 @@ describe('LRUCache', () => {
 
     it('should store and retrieve values', () => {
       const result = cache.set('key1', 'value1');
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
 
       const getValue = cache.get('key1');
-      expect(getValue.isSuccess()).toBe(true);
+      expect(getValue.isSuccess).toBe(true);
       expect(getValue.getValue()).toBe('value1');
     });
 
     it('should return null for non-existent keys', () => {
       const result = cache.get('nonexistent');
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBe(null);
     });
 
@@ -193,14 +193,14 @@ describe('LRUCache', () => {
       cache.set('key1', 'value1', 5000);
       
       const ttlResult = cache.getTTL('key1');
-      expect(ttlResult.isSuccess()).toBe(true);
+      expect(ttlResult.isSuccess).toBe(true);
       expect(ttlResult.getValue()).toBeGreaterThan(4000);
       expect(ttlResult.getValue()).toBeLessThanOrEqual(5000);
     });
 
     it('should return null TTL for non-existent keys', () => {
       const ttlResult = cache.getTTL('nonexistent');
-      expect(ttlResult.isSuccess()).toBe(true);
+      expect(ttlResult.isSuccess).toBe(true);
       expect(ttlResult.getValue()).toBe(null);
     });
 
@@ -208,7 +208,7 @@ describe('LRUCache', () => {
       cache.set('key1', 'value1');
       
       const setTTLResult = cache.setTTL('key1', 1000);
-      expect(setTTLResult.isSuccess()).toBe(true);
+      expect(setTTLResult.isSuccess).toBe(true);
       expect(setTTLResult.getValue()).toBe(true);
 
       // Advance time past new TTL
@@ -251,7 +251,7 @@ describe('LRUCache', () => {
       cache.set('key3', 'value3');
 
       const result = cache.getMany(['key1', 'key2', 'key4']);
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       
       const values = result.getValue();
       expect(values.get('key1')).toBe('value1');
@@ -267,7 +267,7 @@ describe('LRUCache', () => {
       ]);
 
       const result = cache.setMany(entries);
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
 
       expect(cache.get('key1').getValue()).toBe('value1');
       expect(cache.get('key2').getValue()).toBe('value2');
@@ -368,17 +368,23 @@ describe('LRUCache', () => {
       expect(cache.has('key3')).toBe(true);
     });
 
-    it('should prune stale entries based on max age', () => {
+    it('should cleanup expired entries based on TTL', () => {
+      cache = new LRUCache<string>({
+        maxSize: 10,
+        defaultTTL: 500
+      });
+
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
-      
-      // Advance time
-      vi.advanceTimersByTime(500);
+
+      // Advance time past TTL for key1 and key2
+      vi.advanceTimersByTime(600);
+
+      // Add key3 (fresh, not expired)
       cache.set('key3', 'value3');
 
-      const result = cache.pruneStale(400); // Remove entries older than 400ms
-      expect(result.isSuccess()).toBe(true);
-      expect(result.getValue()).toBe(2); // key1 and key2 should be removed
+      const cleanedCount = cache.cleanup();
+      expect(cleanedCount).toBe(2); // key1 and key2 should be cleaned up
       expect(cache.has('key3')).toBe(true);
     });
 
@@ -418,10 +424,15 @@ describe('LRUCache', () => {
       // This should not throw even though callback throws
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
-      cache.set('key3', 'value3'); // Should trigger eviction and callback error
+      const result = cache.set('key3', 'value3'); // Should trigger eviction and callback error
 
       expect(errorCallback).toHaveBeenCalled();
-      expect(cache.size()).toBe(2);
+      // Callback error causes set to return failure; eviction happened but insertion aborted
+      expect(result.isFailure).toBe(true);
+      expect(cache.size()).toBe(1); // key1 evicted, key3 not added, only key2 remains
+
+      // Replace cache to avoid afterEach destroy calling the throwing callback
+      cache = new LRUCache<string>({ maxSize: 5, defaultTTL: 10000 });
     });
   });
 

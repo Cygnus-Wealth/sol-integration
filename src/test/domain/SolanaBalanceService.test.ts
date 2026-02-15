@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { PublicKey } from '@solana/web3.js';
 import { SolanaBalanceService, ISolanaConnection, TokenAccountInfo } from '../../domain/services/SolanaBalanceService';
 import { IAssetRepository } from '../../domain/repositories/IAssetRepository';
 import { IBalanceRepository } from '../../domain/repositories/IBalanceRepository';
@@ -14,6 +15,14 @@ import { TokenAmount } from '../../domain/asset/valueObjects/TokenAmount';
 import { SolanaAsset } from '../../domain/asset/aggregates/SolanaAsset';
 import { Result } from '../../domain/shared/Result';
 import { NetworkError, TimeoutError } from '../../domain/shared/DomainError';
+
+/** Generate a deterministic valid Solana address for testing */
+function testAddress(index: number): string {
+  const bytes = Buffer.alloc(32);
+  bytes[0] = Math.floor(index / 256) + 1;
+  bytes[1] = index % 256;
+  return new PublicKey(bytes).toBase58();
+}
 
 describe('SolanaBalanceService', () => {
   let service: SolanaBalanceService;
@@ -89,7 +98,7 @@ describe('SolanaBalanceService', () => {
       const result = await service.fetchWalletBalance(testWallet);
 
       // Assert
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const balance = result.getValue();
       expect(balance.wallet.toBase58()).toBe(testWallet);
       expect(balance.nativeBalance.getAmount()).toBe(expectedBalance.toString());
@@ -100,7 +109,7 @@ describe('SolanaBalanceService', () => {
     it('should fetch token balances successfully', async () => {
       // Arrange
       const tokenInfo: TokenAccountInfo = {
-        pubkey: PublicKeyVO.create('TokenAccount11111111111111111111111111111111'),
+        pubkey: PublicKeyVO.create(testAddress(101)),
         mint: PublicKeyVO.create('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'), // USDC
         amount: '1000000', // 1 USDC
         decimals: 6,
@@ -142,7 +151,7 @@ describe('SolanaBalanceService', () => {
       });
 
       // Assert
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const balance = result.getValue();
       expect(balance.tokenBalances).toHaveLength(1);
       expect(balance.tokenBalances[0].mint.toBase58()).toBe(tokenInfo.mint.toBase58());
@@ -174,7 +183,7 @@ describe('SolanaBalanceService', () => {
       });
 
       // Assert
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const balance = result.getValue();
       expect(balance.fromCache).toBe(true);
       expect(mockConnection.getBalance).not.toHaveBeenCalled();
@@ -186,8 +195,8 @@ describe('SolanaBalanceService', () => {
       const expectedBalance = BigInt(1000000000);
 
       vi.mocked(mockConnection.getBalance)
-        .mockRejectedValueOnce(networkError)
-        .mockRejectedValueOnce(networkError)
+        .mockResolvedValueOnce(Result.fail(networkError))
+        .mockResolvedValueOnce(Result.fail(networkError))
         .mockResolvedValueOnce(Result.ok(expectedBalance));
 
       vi.mocked(mockConnection.getTokenAccounts).mockResolvedValue(
@@ -207,7 +216,7 @@ describe('SolanaBalanceService', () => {
       const result = await service.fetchWalletBalance(testWallet);
 
       // Assert
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(mockConnection.getBalance).toHaveBeenCalledTimes(3);
     });
 
@@ -226,7 +235,7 @@ describe('SolanaBalanceService', () => {
       const result = await service.fetchWalletBalance(testWallet);
 
       // Assert
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError().code).toBe('NETWORK_ERROR');
       expect(mockConnection.getBalance).toHaveBeenCalledTimes(3); // Max retries
     });
@@ -246,7 +255,7 @@ describe('SolanaBalanceService', () => {
       const result = await service.fetchWalletBalance(testWallet);
 
       // Assert
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError()).toBeInstanceOf(TimeoutError);
     });
 
@@ -254,14 +263,14 @@ describe('SolanaBalanceService', () => {
       // Arrange
       const tokenAccounts: TokenAccountInfo[] = [
         {
-          pubkey: PublicKeyVO.create('TokenAccount11111111111111111111111111111111'),
+          pubkey: PublicKeyVO.create(testAddress(101)),
           mint: PublicKeyVO.create('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
           amount: '1000000',
           decimals: 6,
           uiAmount: 1
         },
         {
-          pubkey: PublicKeyVO.create('TokenAccount22222222222222222222222222222222'),
+          pubkey: PublicKeyVO.create(testAddress(102)),
           mint: PublicKeyVO.create('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'),
           amount: '0',
           decimals: 6,
@@ -294,7 +303,7 @@ describe('SolanaBalanceService', () => {
       });
 
       // Assert
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       const balance = result.getValue();
       expect(balance.tokenBalances).toHaveLength(1);
       expect(balance.tokenBalances[0].balance.getUIAmount()).toBe(1);
@@ -329,7 +338,7 @@ describe('SolanaBalanceService', () => {
       });
 
       // Assert
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(progressUpdates.length).toBeGreaterThan(0);
       expect(progressUpdates[0].progress).toBe(10);
       expect(progressUpdates[progressUpdates.length - 1].progress).toBe(100);
@@ -341,7 +350,7 @@ describe('SolanaBalanceService', () => {
       // Arrange
       const wallets = [
         '7VHS8XAGP3ohBodZXpSLJpqJvjE5p5rWjGXFpRqc9gBU',
-        '8ABC9XBHQ4piCpeaYqTmKqkKwkG6q6sXkHYGqSrb9hCV'
+        testAddress(50)
       ];
 
       vi.mocked(mockConnection.getBalance).mockResolvedValue(
@@ -366,7 +375,7 @@ describe('SolanaBalanceService', () => {
       // Assert
       expect(results.size).toBe(2);
       for (const [wallet, result] of results) {
-        expect(result.isSuccess()).toBe(true);
+        expect(result.isSuccess).toBe(true);
         expect(wallets.includes(wallet)).toBe(true);
       }
     });
@@ -384,7 +393,7 @@ describe('SolanaBalanceService', () => {
       const result = await service.invalidateCache(wallet);
 
       // Assert
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(mockBalanceRepo.invalidateWallet).toHaveBeenCalledWith(
         expect.objectContaining({
           _value: wallet

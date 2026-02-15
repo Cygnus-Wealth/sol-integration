@@ -761,7 +761,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
   // Private helper methods
 
   private generateEndpointId(url: string): string {
-    return `endpoint-${Buffer.from(url).toString('base64').slice(0, 8)}`;
+    return `endpoint-${Buffer.from(url).toString('base64url').replace(/=/g, '')}`;
   }
 
   private createInitialStats(): ConnectionStats {

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { RetryPolicy, RetryStrategy, RetryConfig } from '../../infrastructure/resilience/RetryPolicy';
-import { DomainError, NetworkError, TimeoutError } from '../../domain/shared/DomainError';
+import { DomainError, NetworkError, TimeoutError, ValidationError } from '../../domain/shared/DomainError';
 
 describe('RetryPolicy', () => {
   let retryPolicy: RetryPolicy;
@@ -27,7 +27,7 @@ describe('RetryPolicy', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllTimers();
+    vi.useRealTimers();
   });
 
   describe('Basic Retry Functionality', () => {
@@ -40,7 +40,7 @@ describe('RetryPolicy', () => {
       
       const result = await retryPolicy.execute(operation);
       
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBe('success');
       expect(operation).toHaveBeenCalledTimes(1);
     });
@@ -54,22 +54,22 @@ describe('RetryPolicy', () => {
       const promise = retryPolicy.execute(operation);
       
       // Fast forward through delays
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       const result = await promise;
       
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBe('success');
       expect(operation).toHaveBeenCalledTimes(3);
     });
 
     it('should not retry non-retryable errors', async () => {
-      const nonRetryableError = new DomainError('VALIDATION_ERROR', 'Invalid input');
+      const nonRetryableError = new ValidationError('Invalid input');
       const operation = vi.fn().mockRejectedValue(nonRetryableError);
 
       const result = await retryPolicy.execute(operation);
       
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(operation).toHaveBeenCalledTimes(1);
     });
 
@@ -77,11 +77,11 @@ describe('RetryPolicy', () => {
       const operation = vi.fn().mockRejectedValue(new NetworkError('Persistent failure'));
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       const result = await promise;
       
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(operation).toHaveBeenCalledTimes(config.maxAttempts);
     });
 
@@ -92,11 +92,11 @@ describe('RetryPolicy', () => {
         .mockResolvedValue('success');
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       const result = await promise;
       
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(operation).toHaveBeenCalledTimes(2);
     });
   });
@@ -115,20 +115,20 @@ describe('RetryPolicy', () => {
       // Check delays: should be 1000ms, 2000ms
       expect(operation).toHaveBeenCalledTimes(1);
       
-      vi.advanceTimersByTime(999);
+      await vi.advanceTimersByTimeAsync(999);
       expect(operation).toHaveBeenCalledTimes(1);
       
-      vi.advanceTimersByTime(1);
+      await vi.advanceTimersByTimeAsync(1);
       expect(operation).toHaveBeenCalledTimes(2);
       
-      vi.advanceTimersByTime(1999);
+      await vi.advanceTimersByTimeAsync(1999);
       expect(operation).toHaveBeenCalledTimes(2);
       
-      vi.advanceTimersByTime(1);
+      await vi.advanceTimersByTimeAsync(1);
       expect(operation).toHaveBeenCalledTimes(3);
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
     });
 
     it('should use linear backoff strategy', async () => {
@@ -142,14 +142,14 @@ describe('RetryPolicy', () => {
       const promise = retryPolicy.execute(operation);
       
       // Linear backoff: baseDelay * attempt (1000ms, 2000ms)
-      vi.advanceTimersByTime(1000);
+      await vi.advanceTimersByTimeAsync(1000);
       expect(operation).toHaveBeenCalledTimes(2);
       
-      vi.advanceTimersByTime(2000);
+      await vi.advanceTimersByTimeAsync(2000);
       expect(operation).toHaveBeenCalledTimes(3);
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
     });
 
     it('should use fixed delay strategy', async () => {
@@ -163,14 +163,14 @@ describe('RetryPolicy', () => {
       const promise = retryPolicy.execute(operation);
       
       // Fixed delay: baseDelay for all attempts (1000ms each)
-      vi.advanceTimersByTime(1000);
+      await vi.advanceTimersByTimeAsync(1000);
       expect(operation).toHaveBeenCalledTimes(2);
       
-      vi.advanceTimersByTime(1000);
+      await vi.advanceTimersByTimeAsync(1000);
       expect(operation).toHaveBeenCalledTimes(3);
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
     });
 
     it('should use fibonacci backoff strategy', async () => {
@@ -184,14 +184,14 @@ describe('RetryPolicy', () => {
       const promise = retryPolicy.execute(operation);
       
       // Fibonacci: 1000ms (1), 2000ms (2)
-      vi.advanceTimersByTime(1000);
+      await vi.advanceTimersByTimeAsync(1000);
       expect(operation).toHaveBeenCalledTimes(2);
       
-      vi.advanceTimersByTime(2000);
+      await vi.advanceTimersByTimeAsync(2000);
       expect(operation).toHaveBeenCalledTimes(3);
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
     });
 
     it('should respect max delay', async () => {
@@ -212,15 +212,15 @@ describe('RetryPolicy', () => {
       const promise = retryPolicy.execute(operation);
       
       // First delay: 1000ms
-      vi.advanceTimersByTime(1000);
+      await vi.advanceTimersByTimeAsync(1000);
       expect(operation).toHaveBeenCalledTimes(2);
       
       // Second delay: should be capped at maxDelay (1500ms) instead of 3000ms
-      vi.advanceTimersByTime(1500);
+      await vi.advanceTimersByTimeAsync(1500);
       expect(operation).toHaveBeenCalledTimes(3);
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
     });
   });
 
@@ -240,7 +240,7 @@ describe('RetryPolicy', () => {
       
       // With jitter, delay should be baseDelay ± 10%
       // With random = 0.5, jitter = 0, so delay should be 1000ms
-      vi.advanceTimersByTime(1000);
+      await vi.advanceTimersByTimeAsync(1000);
       expect(operation).toHaveBeenCalledTimes(2);
       
       await promise;
@@ -258,10 +258,10 @@ describe('RetryPolicy', () => {
       const promise = retryPolicy.execute(operation);
       
       // Without jitter, delay should be exactly baseDelay
-      vi.advanceTimersByTime(999);
+      await vi.advanceTimersByTimeAsync(999);
       expect(operation).toHaveBeenCalledTimes(1);
       
-      vi.advanceTimersByTime(1);
+      await vi.advanceTimersByTimeAsync(1);
       expect(operation).toHaveBeenCalledTimes(2);
       
       await promise;
@@ -280,10 +280,10 @@ describe('RetryPolicy', () => {
         .mockResolvedValue('success');
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(operation).toHaveBeenCalledTimes(2);
     });
 
@@ -293,7 +293,7 @@ describe('RetryPolicy', () => {
 
       const result = await retryPolicy.execute(operation);
       
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(operation).toHaveBeenCalledTimes(1);
     });
 
@@ -304,24 +304,24 @@ describe('RetryPolicy', () => {
         .mockResolvedValue('success');
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(operation).toHaveBeenCalledTimes(2);
     });
 
     it('should retry on configured error codes', async () => {
-      const configuredError = new DomainError('NETWORK_ERROR', 'Network issue');
+      const configuredError = new NetworkError('Network issue');
       const operation = vi.fn()
         .mockRejectedValueOnce(configuredError)
         .mockResolvedValue('success');
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(operation).toHaveBeenCalledTimes(2);
     });
 
@@ -332,10 +332,10 @@ describe('RetryPolicy', () => {
         .mockResolvedValue('success');
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       const result = await promise;
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(operation).toHaveBeenCalledTimes(2);
     });
   });
@@ -351,7 +351,7 @@ describe('RetryPolicy', () => {
         .mockResolvedValue('success');
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       await promise;
       
@@ -367,7 +367,7 @@ describe('RetryPolicy', () => {
       const operation = vi.fn().mockRejectedValue(new NetworkError('Persistent fail'));
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       await promise;
       
@@ -387,7 +387,7 @@ describe('RetryPolicy', () => {
       await retryPolicy.execute(operation1);
       
       const promise = retryPolicy.execute(operation2);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       await promise;
       
       const metrics = retryPolicy.getMetrics();
@@ -401,14 +401,16 @@ describe('RetryPolicy', () => {
         .mockResolvedValue('success');
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       await promise;
       
       const recentAttempts = retryPolicy.getRecentAttempts(5);
-      expect(recentAttempts).toHaveLength(1);
+      expect(recentAttempts).toHaveLength(2);
       expect(recentAttempts[0].attemptNumber).toBe(1);
-      expect(recentAttempts[0].success).toBe(true);
+      expect(recentAttempts[0].success).toBe(false);
+      expect(recentAttempts[1].attemptNumber).toBe(2);
+      expect(recentAttempts[1].success).toBe(true);
     });
 
     it('should reset metrics', async () => {
@@ -472,7 +474,7 @@ describe('RetryPolicy', () => {
         .mockResolvedValue('success');
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       await promise;
       
@@ -505,7 +507,7 @@ describe('RetryPolicy', () => {
       const operation = vi.fn().mockRejectedValue(new NetworkError('Persistent fail'));
 
       const promise = retryPolicy.execute(operation);
-      vi.runAllTimers();
+      await vi.runAllTimersAsync();
       
       await promise;
       
@@ -557,7 +559,7 @@ describe('RetryPolicy', () => {
       
       const result = await retryPolicy.execute(operation);
       
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(operation).not.toHaveBeenCalled();
     });
 
@@ -569,7 +571,7 @@ describe('RetryPolicy', () => {
       
       const result = await retryPolicy.execute(operation);
       
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(operation).toHaveBeenCalledTimes(1);
     });
 
@@ -578,7 +580,7 @@ describe('RetryPolicy', () => {
       
       const result = await retryPolicy.execute(operation);
       
-      expect(result.isSuccess()).toBe(true);
+      expect(result.isSuccess).toBe(true);
       expect(result.getValue()).toBe(null);
     });
 
@@ -589,7 +591,7 @@ describe('RetryPolicy', () => {
       
       const result = await retryPolicy.execute(operation);
       
-      expect(result.isFailure()).toBe(true);
+      expect(result.isFailure).toBe(true);
       expect(result.getError().message).toContain('String error');
     });
   });
