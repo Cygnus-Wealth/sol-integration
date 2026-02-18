@@ -214,6 +214,13 @@ export class WebSocketManager {
     this.connection = null;
 
     this.reconnectAttempts++;
+
+    // Switch to next endpoint after repeated failures on current one
+    if (this.reconnectAttempts > 2 && this.sortedEndpoints.length > 1) {
+      this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.sortedEndpoints.length;
+      this.reconnectAttempts = 1;
+    }
+
     const delay = this.calculateBackoffDelay();
     const endpoint = this.getCurrentEndpoint();
 
@@ -224,18 +231,12 @@ export class WebSocketManager {
     this.clearReconnectTimer();
     this.reconnectTimer = setTimeout(async () => {
       try {
-        // Try next endpoint if current has failed multiple times
-        if (this.reconnectAttempts > 2 && this.sortedEndpoints.length > 1) {
-          this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.sortedEndpoints.length;
-        }
-
         this.state = 'disconnected';
         await this.connect();
       } catch {
-        // connect() already emits error event; schedule another retry
-        if (!this.destroyed) {
-          this.reconnect();
-        }
+        // Connection attempt failed; stay disconnected for next retry
+        // (heartbeat or polling fallback will trigger the next reconnect)
+        this.state = 'disconnected';
       }
     }, delay);
   }
