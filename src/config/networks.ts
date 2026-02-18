@@ -15,11 +15,16 @@ export interface NetworkConfig {
   wsEndpoint?: string;
 }
 
+/**
+ * NOTE: api.mainnet-beta.solana.com is intentionally NOT used as primary.
+ * Production should use createSolIntegration() with a dedicated RPC provider.
+ * The URL below is a placeholder; real endpoints come from RpcProviderConfig.
+ */
 export const NETWORK_CONFIGS: Record<NetworkEnvironment, NetworkConfig> = {
   production: {
-    clusterUrl: 'https://api.mainnet-beta.solana.com',
+    clusterUrl: 'https://rpc.placeholder.solana.com',
     clusterName: 'mainnet-beta',
-    wsEndpoint: 'wss://api.mainnet-beta.solana.com',
+    wsEndpoint: undefined,
   },
   testnet: {
     clusterUrl: 'https://api.devnet.solana.com',

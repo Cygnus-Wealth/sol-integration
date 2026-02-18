@@ -48,6 +48,27 @@ export {
   resolveEndpoints
 } from './config/networks';
 
+// RPC Fallback Chain (Phase 5)
+export {
+  createSolIntegration,
+  RpcFallbackChain,
+  TokenBucketRateLimiter,
+  HealthMonitor,
+  DAS_METHODS,
+} from './infrastructure/rpc';
+export type {
+  SolIntegration,
+  RpcProviderConfig,
+  RpcEndpointConfig,
+  RpcEndpointCapability,
+  RpcCallOptions,
+  EndpointState,
+  FallbackChainMetrics,
+  TokenBucketConfig,
+  EndpointHealth,
+  HealthMonitorConfig,
+} from './infrastructure/rpc';
+
 // Default export for convenience
 import { SolanaIntegrationFacade } from './application/SolanaIntegrationFacade';
 export default SolanaIntegrationFacade;
