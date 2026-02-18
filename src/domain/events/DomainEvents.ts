@@ -448,6 +448,128 @@ export class CircuitBreakerOpenedEvent extends DomainEvent {
 }
 
 /**
+ * WebSocket Connected Event
+ */
+export class WebSocketConnectedEvent extends DomainEvent {
+  constructor(
+    public readonly endpointUrl: string,
+    public readonly endpointName: string
+  ) {
+    super('WebSocketConnected', endpointName, 'WebSocket');
+  }
+
+  getPayload(): Record<string, any> {
+    return {
+      endpointUrl: this.endpointUrl,
+      endpointName: this.endpointName,
+    };
+  }
+}
+
+/**
+ * WebSocket Disconnected Event
+ */
+export class WebSocketDisconnectedEvent extends DomainEvent {
+  constructor(
+    public readonly endpointUrl: string,
+    public readonly endpointName: string,
+    public readonly reason: string,
+    public readonly wasClean: boolean
+  ) {
+    super('WebSocketDisconnected', endpointName, 'WebSocket');
+  }
+
+  getPayload(): Record<string, any> {
+    return {
+      endpointUrl: this.endpointUrl,
+      endpointName: this.endpointName,
+      reason: this.reason,
+      wasClean: this.wasClean,
+    };
+  }
+}
+
+/**
+ * WebSocket Reconnecting Event
+ */
+export class WebSocketReconnectingEvent extends DomainEvent {
+  constructor(
+    public readonly endpointUrl: string,
+    public readonly endpointName: string,
+    public readonly attempt: number,
+    public readonly delayMs: number
+  ) {
+    super('WebSocketReconnecting', endpointName, 'WebSocket');
+  }
+
+  getPayload(): Record<string, any> {
+    return {
+      endpointUrl: this.endpointUrl,
+      endpointName: this.endpointName,
+      attempt: this.attempt,
+      delayMs: this.delayMs,
+    };
+  }
+}
+
+/**
+ * WebSocket Error Event
+ */
+export class WebSocketErrorEvent extends DomainEvent {
+  constructor(
+    public readonly endpointUrl: string,
+    public readonly endpointName: string,
+    public readonly errorMessage: string
+  ) {
+    super('WebSocketError', endpointName, 'WebSocket');
+  }
+
+  getPayload(): Record<string, any> {
+    return {
+      endpointUrl: this.endpointUrl,
+      endpointName: this.endpointName,
+      errorMessage: this.errorMessage,
+    };
+  }
+}
+
+/**
+ * WebSocket Fallback Activated Event
+ */
+export class WebSocketFallbackActivatedEvent extends DomainEvent {
+  constructor(
+    public readonly endpointName: string,
+    public readonly pollingIntervalMs: number
+  ) {
+    super('WebSocketFallbackActivated', endpointName, 'WebSocket');
+  }
+
+  getPayload(): Record<string, any> {
+    return {
+      endpointName: this.endpointName,
+      pollingIntervalMs: this.pollingIntervalMs,
+    };
+  }
+}
+
+/**
+ * WebSocket Fallback Deactivated Event
+ */
+export class WebSocketFallbackDeactivatedEvent extends DomainEvent {
+  constructor(
+    public readonly endpointName: string
+  ) {
+    super('WebSocketFallbackDeactivated', endpointName, 'WebSocket');
+  }
+
+  getPayload(): Record<string, any> {
+    return {
+      endpointName: this.endpointName,
+    };
+  }
+}
+
+/**
  * Event Bus Interface
  */
 export interface IDomainEventBus {

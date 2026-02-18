@@ -11,10 +11,13 @@
 import { RpcProviderConfig } from './types';
 import { RpcFallbackChain } from './RpcFallbackChain';
 import { SolanaIntegrationFacade, SolanaConfig } from '../../application/SolanaIntegrationFacade';
+import { SubscriptionService } from '../websocket/SubscriptionService';
+import { WebSocketEndpointConfig } from '../websocket/types';
 
 export interface SolIntegration {
   facade: SolanaIntegrationFacade;
   fallbackChain: RpcFallbackChain;
+  subscriptionService: SubscriptionService;
   destroy: () => void;
 }
 
@@ -49,6 +52,26 @@ export function createSolIntegration(config: RpcProviderConfig): SolIntegration 
 
   const facade = new SolanaIntegrationFacade(facadeConfig);
 
+  // Build WebSocket endpoint configs from RPC endpoints with websocket capability
+  const wsEndpoints: WebSocketEndpointConfig[] = sortedEndpoints
+    .filter(ep => ep.capabilities.includes('websocket'))
+    .map(ep => ({
+      url: ep.url,
+      name: ep.name,
+      priority: ep.priority,
+      wsUrl: ep.url.replace(/^https?:\/\//, (match) => match === 'https://' ? 'wss://' : 'ws://'),
+    }));
+
+  const subscriptionService = new SubscriptionService(
+    wsEndpoints.length > 0 ? wsEndpoints : sortedEndpoints.map(ep => ({
+      url: ep.url,
+      name: ep.name,
+      priority: ep.priority,
+      wsUrl: ep.url.replace(/^https?:\/\//, (match) => match === 'https://' ? 'wss://' : 'ws://'),
+    })),
+    { commitment: config.commitment || 'confirmed' }
+  );
+
   // Start health monitoring if enabled
   if (config.enableHealthMonitoring !== false) {
     fallbackChain.startHealthMonitoring();
@@ -57,8 +80,10 @@ export function createSolIntegration(config: RpcProviderConfig): SolIntegration 
   return {
     facade,
     fallbackChain,
+    subscriptionService,
     destroy: () => {
       fallbackChain.destroy();
+      subscriptionService.destroy();
     },
   };
 }

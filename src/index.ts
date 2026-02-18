@@ -56,7 +56,15 @@ export { SolanaBalanceService } from './domain/services/SolanaBalanceService';
 export { TokenDiscoveryService } from './domain/services/TokenDiscoveryService';
 
 // Domain Events
-export { DomainEvent } from './domain/events/DomainEvents';
+export {
+  DomainEvent,
+  WebSocketConnectedEvent,
+  WebSocketDisconnectedEvent,
+  WebSocketReconnectingEvent,
+  WebSocketErrorEvent,
+  WebSocketFallbackActivatedEvent,
+  WebSocketFallbackDeactivatedEvent,
+} from './domain/events/DomainEvents';
 
 // Shared Domain
 export { Result } from './domain/shared/Result';
@@ -97,6 +105,27 @@ export type {
   EndpointHealth,
   HealthMonitorConfig,
 } from './infrastructure/rpc';
+
+// WebSocket Subscription Service
+export {
+  SubscriptionService,
+  WebSocketManager,
+  PollingFallback,
+  DEFAULT_WS_CONFIG,
+} from './infrastructure/websocket';
+export type {
+  WebSocketConfig,
+  WebSocketEndpointConfig,
+  WebSocketState,
+  SubscriptionType,
+  SubscriptionCallback,
+  SubscriptionNotification,
+  SubscriptionStatus,
+  ProgramFilter,
+} from './infrastructure/websocket';
+
+// Subscription Service Interface
+export type { ISubscriptionService } from './domain/services/ISubscriptionService';
 
 // Default export for convenience
 import { SolanaIntegrationFacade } from './application/SolanaIntegrationFacade';
