@@ -19,6 +19,35 @@ export { NFTAsset, NFTAttribute } from './domain/asset/entities/NFTAsset';
 // Re-export AssetType from data-models for convenience
 export { AssetType } from '@cygnus-wealth/data-models';
 
+// DeFi Module
+export {
+  DeFiService,
+  MarinadeAdapter,
+  RaydiumAdapter,
+  JupiterAdapter,
+  OrcaAdapter,
+  MSOL_MINT,
+  MARINADE_FINANCE_PROGRAM_ID,
+  MARINADE_STATE_ADDRESS,
+  RAYDIUM_AMM_PROGRAM_ID,
+  RAYDIUM_CLMM_PROGRAM_ID,
+  JUPITER_DCA_PROGRAM_ID,
+  JUPITER_LIMIT_ORDER_PROGRAM_ID,
+  JUPITER_PERPS_PROGRAM_ID,
+  ORCA_WHIRLPOOL_PROGRAM_ID,
+} from './defi';
+export type {
+  ISolanaDeFiProtocol,
+  DeFiPositions,
+  DeFiServiceConfig,
+  DeFiQueryOptions,
+  DeFiServiceStats,
+  MarinadeAdapterOptions,
+  RaydiumAdapterOptions,
+  JupiterAdapterOptions,
+  OrcaAdapterOptions,
+} from './defi';
+
 // Domain Aggregates
 export { PortfolioAggregate } from './domain/portfolio/aggregates/PortfolioAggregate';
 
