@@ -142,7 +142,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
         timeout: endpoint.timeoutMs,
         monitoringPeriod: this.poolConfig.healthCheckInterval,
         onStateChange: (oldState, newState, reason) => {
-          console.warn(`[${endpoint.url}] Circuit breaker: ${oldState} -> ${newState}. ${reason}`);
+          console.debug(`[${endpoint.url}] Circuit breaker: ${oldState} -> ${newState}. ${reason}`);
           this.updateEndpointHealthScore(id, newState === 'CLOSED' ? 100 : 0);
         }
       };
@@ -835,7 +835,7 @@ export class SolanaConnectionRepository implements IConnectionRepository {
       try {
         await this.checkAllEndpointsHealth();
       } catch (error) {
-        console.error('Health monitoring error:', error);
+        console.debug('Health monitoring error:', error);
       }
       
       if (this.isHealthMonitoringActive) {

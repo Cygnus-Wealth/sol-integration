@@ -16,15 +16,16 @@ export interface NetworkConfig {
 }
 
 /**
- * NOTE: api.mainnet-beta.solana.com is intentionally NOT used as primary.
- * Production should use createSolIntegration() with a dedicated RPC provider.
- * The URL below is a placeholder; real endpoints come from RpcProviderConfig.
+ * NOTE: api.mainnet-beta.solana.com is a public fallback endpoint.
+ * Production should use createSolIntegration() with a dedicated RPC provider
+ * (e.g., Helius, QuickNode) for better reliability and rate limits.
+ * The URL below is a CORS-friendly default for when no provider is configured.
  */
 export const NETWORK_CONFIGS: Record<NetworkEnvironment, NetworkConfig> = {
   production: {
-    clusterUrl: 'https://rpc.placeholder.solana.com',
+    clusterUrl: 'https://api.mainnet-beta.solana.com',
     clusterName: 'mainnet-beta',
-    wsEndpoint: undefined,
+    wsEndpoint: 'wss://api.mainnet-beta.solana.com',
   },
   testnet: {
     clusterUrl: 'https://api.devnet.solana.com',

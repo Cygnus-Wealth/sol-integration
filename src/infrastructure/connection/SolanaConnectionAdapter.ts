@@ -64,7 +64,7 @@ export class SolanaConnectionAdapter implements ISolanaConnection, ITokenDiscove
         monitoringPeriod: 60000,
         ...config.circuitBreakerConfig,
         onStateChange: (oldState, newState, reason) => {
-          console.warn(`[${config.endpoint}] Circuit breaker state changed: ${oldState} -> ${newState}. Reason: ${reason}`);
+          console.debug(`[${config.endpoint}] Circuit breaker state changed: ${oldState} -> ${newState}. Reason: ${reason}`);
         }
       };
       
@@ -81,7 +81,7 @@ export class SolanaConnectionAdapter implements ISolanaConnection, ITokenDiscove
         jitter: true,
         retryableErrors: ['NETWORK_ERROR', 'TIMEOUT_ERROR', 'RPC_ERROR'],
         onRetry: (attempt, error, delay) => {
-          console.warn(`[${config.endpoint}] Retry attempt ${attempt} after ${delay}ms. Error: ${error.message}`);
+          console.debug(`[${config.endpoint}] Retry attempt ${attempt} after ${delay}ms. Error: ${error.message}`);
         }
       }, RetryStrategy.EXPONENTIAL_BACKOFF);
     }
@@ -420,12 +420,16 @@ export class SolanaConnectionAdapter implements ISolanaConnection, ITokenDiscove
       );
     }
 
-    // Check for network errors
+    // Check for network errors (including DNS failures)
     if (
       message.includes('fetch') ||
       message.includes('network') ||
       message.includes('ECONNREFUSED') ||
-      message.includes('ETIMEDOUT')
+      message.includes('ETIMEDOUT') ||
+      message.includes('ENOTFOUND') ||
+      message.includes('ERR_NAME_NOT_RESOLVED') ||
+      message.includes('DNS') ||
+      message.includes('getaddrinfo')
     ) {
       return new NetworkError(
         `Network error in ${operation}: ${message}`,

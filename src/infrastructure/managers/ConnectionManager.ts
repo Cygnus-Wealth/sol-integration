@@ -439,7 +439,7 @@ export class ConnectionManager implements IConnectionManager {
     try {
       await this.forceHealthCheck();
     } catch (error) {
-      console.error('Health check failed:', error);
+      console.debug('Health check failed:', error);
     }
   }
 
@@ -470,7 +470,7 @@ export class ConnectionManager implements IConnectionManager {
         }
       }
     } catch (error) {
-      console.error('Recovery attempt failed:', error);
+      console.debug('Recovery attempt failed:', error);
     }
   }
 
@@ -493,7 +493,7 @@ export class ConnectionManager implements IConnectionManager {
         try {
           handler(data);
         } catch (error) {
-          console.error(`Error in event handler for ${event}:`, error);
+          console.debug(`Error in event handler for ${event}:`, error);
         }
       }
     }
